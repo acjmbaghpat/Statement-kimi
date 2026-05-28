@@ -1,0 +1,1907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Court Statement Manager - ACJM Baghpat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; }
+        .input-cell { width: 70px; text-align: center; border: 1px solid #e2e8f0; padding: 3px; border-radius: 4px; font-size: 12px; }
+        .input-cell:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+        .statement-table th { background: #1e293b; color: white; font-size: 11px; padding: 6px; text-align: center; border: 1px solid #334155; }
+        .statement-table td { border: 1px solid #cbd5e1; padding: 5px; font-size: 12px; text-align: center; }
+        .statement-table tr:nth-child(even) { background: #f8fafc; }
+        .nav-btn.active { background: #2563eb; color: white; }
+        .status-red { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+        .status-green { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+        .status-yellow { background: #fef9c3; color: #ca8a04; border: 1px solid #fde047; }
+        .modal-overlay { background: rgba(0,0,0,0.5); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        .sticky-col { position: sticky; left: 0; background: white; z-index: 10; }
+        .manual-cell { background: #fef9c3 !important; }
+        .manual-cell:focus { outline: 2px solid #ca8a04; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+<div id="app" class="min-h-screen flex flex-col">
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-scale-balanced text-2xl text-blue-400"></i>
+                <div>
+                    <h1 class="text-lg font-bold">Court Statement Manager</h1>
+                    <p class="text-xs text-slate-400">ACJM Baghpat | Monthly Statement Generator</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 bg-slate-700 rounded-lg px-3 py-2">
+                    <label class="text-xs text-slate-300">Month:</label>
+                    <input type="month" id="monthSelector" class="bg-slate-600 text-white text-sm rounded px-2 py-1 border-none outline-none">
+                    <button onclick="app.newMonth()" class="text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded">
+                        <i class="fas fa-plus"></i> New
+                    </button>
+                </div>
+                <button onclick="app.saveData(true)" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="bg-white border-b border-slate-200 sticky top-16 z-40">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex gap-1 py-2">
+                <button onclick="app.switchTab('dataEntry')" id="tab-dataEntry" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium">
+                    <i class="fas fa-table"></i> Data Entry
+                </button>
+                <button onclick="app.switchTab('statements')" id="tab-statements" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
+                    <i class="fas fa-file-invoice"></i> Statements 
+                    <span id="stmtBadge" class="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 ml-1">0/26</span>
+                </button>
+                <button onclick="app.switchTab('settings')" id="tab-settings" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
+                    <i class="fas fa-cog"></i> Settings
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+        <div id="view-dataEntry">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-bold text-slate-800">
+                        <i class="fas fa-pen-to-square text-blue-600"></i> Category-wise Data Entry
+                    </h2>
+                    <div class="flex gap-2">
+                        <button onclick="app.addYear()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-sm">
+                            <i class="fas fa-plus"></i> Add Year
+                        </button>
+                        <button onclick="app.carryForward()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-sm">
+                            <i class="fas fa-forward"></i> Auto-Fill Opening
+                        </button>
+                        <button onclick="app.clearAllData()" class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded text-sm">
+                            <i class="fas fa-trash"></i> Clear Month
+                        </button>
+                    </div>
+                </div>
+                <p class="text-sm text-slate-500 mb-3">
+                    Enter <strong>Opening Balance, Institution, Disposal & Transfer</strong> data for each category and year. Closing auto-calculates.
+                </p>
+                <div class="flex gap-4 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg">
+                    <span><span class="inline-block w-3 h-3 bg-blue-100 border border-blue-300 rounded mr-1"></span>OB = Opening</span>
+                    <span><span class="inline-block w-3 h-3 bg-green-100 border border-green-300 rounded mr-1"></span>Inst = Institution</span>
+                    <span><span class="inline-block w-3 h-3 bg-red-100 border border-red-300 rounded mr-1"></span>Disp = Disposal</span>
+                    <span><span class="inline-block w-3 h-3 bg-purple-100 border border-purple-300 rounded mr-1"></span>Trf = Transfer</span>
+                </div>
+            </div>
+            <div id="dataEntryContainer"></div>
+        </div>
+
+        <div id="view-statements" style="display:none;">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <h2 class="text-lg font-bold text-slate-800 mb-1">
+                    <i class="fas fa-file-lines text-blue-600"></i> Generated Statements
+                </h2>
+                <p class="text-sm text-slate-500 mb-4">Click any statement to view, edit and download as XLSX. All 26 statements from New Master Excel included.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="statementsGrid"></div>
+            </div>
+        </div>
+
+        <div id="view-settings" style="display:none;">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-4xl mx-auto space-y-6">
+                <h2 class="text-lg font-bold text-slate-800 mb-4">Settings & Data Management</h2>
+
+                <div class="border border-slate-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-slate-700">Manage Categories</h3>
+                        <button onclick="app.toggleCategoryForm()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                            <i class="fas fa-plus"></i> Add Category
+                        </button>
+                    </div>
+                    <div id="categoryForm" class="hidden mb-3 bg-slate-50 p-3 rounded-lg">
+                        <div class="grid grid-cols-3 gap-2 mb-2">
+                            <input type="text" id="newCatId" placeholder="ID (e.g. ws_state_new)" class="border rounded px-2 py-1 text-sm">
+                            <input type="text" id="newCatGroup" placeholder="Group (e.g. W/S State)" class="border rounded px-2 py-1 text-sm">
+                            <input type="text" id="newCatName" placeholder="Name (e.g. New Act)" class="border rounded px-2 py-1 text-sm">
+                        </div>
+                        <button onclick="app.addCategory()" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Save Category</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead><tr class="bg-slate-100"><th class="text-left px-2 py-1">ID</th><th class="text-left px-2 py-1">Group</th><th class="text-left px-2 py-1">Name</th><th class="px-2 py-1">Action</th></tr></thead>
+                            <tbody id="categoriesTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="border border-slate-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-slate-700">Manage Years</h3>
+                        <button onclick="app.addYear()" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm">
+                            <i class="fas fa-plus"></i> Add Year
+                        </button>
+                    </div>
+                    <div id="yearsList" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="border border-slate-200 rounded-lg p-4">
+                    <h3 class="font-semibold text-slate-700 mb-2">Export All Data</h3>
+                    <button onclick="app.exportJSON()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">
+                        <i class="fas fa-download"></i> Download JSON Backup
+                    </button>
+                </div>
+                <div class="border border-slate-200 rounded-lg p-4">
+                    <h3 class="font-semibold text-slate-700 mb-2">Import Data</h3>
+                    <input type="file" id="importFile" accept=".json" onchange="app.importJSON(this)" class="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700">
+                </div>
+                <div class="border border-red-200 bg-red-50 rounded-lg p-4">
+                    <h3 class="font-semibold text-red-700 mb-2">Danger Zone</h3>
+                    <button onclick="app.resetAllData()" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">
+                        <i class="fas fa-exclamation-triangle"></i> Reset All Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="statementModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-xl">
+            <div>
+                <h3 id="modalTitle" class="text-lg font-bold text-slate-800">Statement Title</h3>
+                <p id="modalSubtitle" class="text-sm text-slate-500">Month: April 2026</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="app.downloadCurrentStatement()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm">
+                    <i class="fas fa-file-excel"></i> Download XLSX
+                </button>
+                <button onclick="app.closeModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+        <div class="flex-1 overflow-auto p-4" id="modalContent"></div>
+        <div class="p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-between items-center">
+            <span class="text-xs text-slate-500">Yellow cells are editable manual entries. Click Save Manual Changes to persist.</span>
+            <button onclick="app.saveManualEdits()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm">
+                <i class="fas fa-check"></i> Save Manual Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'csm_v11';
+
+const DEFAULT_CATEGORIES = [
+    { id: 'ws_state_arms', group: 'W/S State', name: 'Arms Act' },
+    { id: 'ws_state_excise', group: 'W/S State', name: 'Excise Act' },
+    { id: 'ws_state_mp_mla', group: 'W/S State', name: 'MP/MLA' },
+    { id: 'ws_state_ndps', group: 'W/S State', name: 'NDPS' },
+    { id: 'ws_state_committal_rape', group: 'W/S State', name: 'Committal (Rape)' },
+    { id: 'ws_state_committal_other', group: 'W/S State', name: 'Committal (Other)' },
+    { id: 'ws_state_sh', group: 'W/S State', name: 'Sexual Harassment (SH)' },
+    { id: 'ws_state_ec37', group: 'W/S State', name: '3/7 EC' },
+    { id: 'ws_state_other', group: 'W/S State', name: 'Other' },
+    { id: 'ws_complaint', group: 'W/S Complaint', name: 'W/S Complaint' },
+    { id: 'summons_state_of716', group: 'Summons State', name: '7/16 OF' },
+    { id: 'summons_state_fss', group: 'Summons State', name: 'FSS' },
+    { id: 'summons_state_other', group: 'Summons State', name: 'Other' },
+    { id: 'summons_complaint_ni', group: 'Summons Complaint', name: 'NI Act' },
+    { id: 'summons_complaint_other', group: 'Summons Complaint', name: 'Other Complaint' },
+    { id: 'mv_act', group: 'MV Act', name: 'MV Act (Traffic Challan)' },
+    { id: 'other_challan', group: 'Other Challan', name: 'Other Challan (Municipal etc)' },
+    { id: 'wm_challan', group: 'W/M Challan', name: 'W/M Challan' },
+    { id: 'fr', group: 'Final Report', name: 'Final Report (FR)' },
+    { id: 'crim_misc_173', group: 'Criminal Misc', name: 'Criminal Misc (173 BNSS)' },
+    { id: 'crim_misc_other', group: 'Criminal Misc', name: 'Criminal Misc (Others)' },
+    { id: 'bail', group: 'Bail', name: 'Bail Applications' }
+];
+
+const DEFAULT_YEARS = [];
+for (let y = 1993; y <= 2026; y++) DEFAULT_YEARS.push(String(y));
+
+const STATEMENTS = [
+    { id: 'pendency_arrears', name: 'Pendency Arrears', desc: 'Pre-trial (FR) & Excluding Pre-trial', auto: true },
+    { id: 'ni_act_breakup', name: 'NI Act Breakup', desc: 'Negotiable Instruments Act details', auto: true },
+    { id: 'breakup', name: 'Nature-wise Breakup', desc: 'Year-wise category breakup', auto: true },
+    { id: 'contested', name: 'Contested / Non-Contested', desc: 'Institution & Disposal split', auto: true },
+    { id: 'actual_dispo', name: 'Actual Disposal', desc: 'Year-wise actual disposal', auto: true },
+    { id: 'apar_dj', name: 'Apar-DJ (Old Cases)', desc: '5-10, 10-20, 20-30, 30+ years', auto: true },
+    { id: 'rape_mp_mla', name: 'Monthly Rape / MP / MLA', desc: 'Sexual offences and MP/MLA cases', auto: true },
+    { id: 'ndps', name: 'NDPS Statement', desc: 'NDPS Act quarterly data', auto: true },
+    { id: 'petty_ni', name: 'Petty Offences & NI Act', desc: 'Traffic/Municipal Challan & NI Act', auto: true },
+    { id: 's3', name: 'S3 Statement', desc: 'Special category cases', auto: true },
+    { id: 'information', name: 'Information Statement', desc: 'Civil/Criminal summary', auto: true },
+    { id: 'mission_mode', name: 'Mission Mode (Type-wise)', desc: 'Type-wise pendency', auto: true },
+    { id: 'monthly_petty_acd', name: 'Monthly Petty ACD (Proforma A)', desc: 'Pendency of Petty/Non-Petty, Summons, Saral Scheme', auto: false },
+    { id: 'monthly_third', name: 'Monthly Third Statement', desc: 'Civil/Criminal Cases, Institution & Disposal', auto: false },
+    { id: 'monthly_first', name: 'Monthly First Statement', desc: 'Proforma 1-4: Warrant/Summon/Undertrial/FR', auto: false },
+    { id: 'monthly_second', name: 'Monthly Second Statement', desc: 'Age-wise breakup, Stayed, POCSO, Disposal', auto: false },
+    { id: 'quota', name: 'Out-turn of Work-done (Quota)', desc: 'Work units & administrative work', auto: false },
+    { id: 'quarter_sh', name: 'Quarterly SH / Rape', desc: 'Quarterly sexual harassment & rape cases', auto: false },
+    { id: 'quarterly_inst_dispo', name: 'Quarterly Instituted & Disposed', desc: 'Quarterly civil/criminal summary', auto: false },
+    { id: 'crpc_299', name: '299 Cr.P.C. Absconding', desc: 'Accused absconding u/s 299 Cr.P.C.', auto: false },
+    { id: 'seven_year_old', name: 'Seven Years Old Cases', desc: 'Cases pending more than 7 years', auto: false },
+    { id: 'new_quarterly', name: 'New Quarterly Statistical', desc: 'Quarterly statistical information 0-5/5-10/10-20/20-30/30+', auto: false },
+    { id: 'ni_quarterly', name: 'NI Quarterly Disposal', desc: 'Disposal of old cases - NI/Family/Commercial etc', auto: false },
+    { id: 'half_yearly_1', name: 'Half Yearly Statement No. 03', desc: 'Institution, Disposal & Pendency period-wise', auto: false },
+    { id: 'half_yearly_2', name: 'Half Yearly Statement No. 07', desc: 'Nature-wise pending at end of half year', auto: false },
+    { id: 'yearly', name: 'Yearly Statement (Annexure IV)', desc: 'Yearly institution, disposal, pendency, judge strength', auto: false }
+];
+
+const APAR_RANGES = {
+    '5-10': ['2014','2015','2016','2017','2018','2019'],
+    '10-20': ['2005','2006','2007','2008','2009','2010','2011','2012','2013'],
+    '20-30': ['1994','1995','1996','1997','1998','1999','2000','2001','2002','2003','2004'],
+    '30+': ['1993']
+};
+
+class CourtStatementManager {
+    constructor() {
+        this.data = this.loadData();
+        this.currentMonth = this.data.currentMonth || '2026-04';
+        if (!this.data.groupFilters) this.data.groupFilters = {};
+        this.currentStatement = null;
+        this.init();
+    }
+
+    init() {
+        const sel = document.getElementById('monthSelector');
+        sel.value = this.currentMonth;
+        sel.addEventListener('change', (e) => {
+            this.currentMonth = e.target.value;
+            this.ensureMonthExists(this.currentMonth);
+            this.renderDataEntry();
+            this.updateStatementBadge();
+        });
+        this.ensureMonthExists(this.currentMonth);
+        this.renderDataEntry();
+        this.updateStatementBadge();
+        this.renderSettings();
+    }
+
+    getCategories() {
+        return this.data.categories || DEFAULT_CATEGORIES;
+    }
+
+    getYears() {
+        return this.data.years || DEFAULT_YEARS;
+    }
+
+    loadData() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (!parsed.categories) parsed.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+                if (!parsed.years) parsed.years = [...DEFAULT_YEARS];
+                return parsed;
+            }
+        } catch(e) { console.error('Load error', e); }
+        return { version: 11, currentMonth: '2026-04', months: {}, years: [...DEFAULT_YEARS], categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)) };
+    }
+
+    saveData(showAlert = false) {
+        this.data.currentMonth = this.currentMonth;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+        const btn = document.querySelector('button[onclick="app.saveData(true)"]');
+        if (btn) {
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+            btn.classList.add('bg-emerald-700');
+            setTimeout(() => {
+                btn.innerHTML = original;
+                btn.classList.remove('bg-emerald-700');
+            }, 1500);
+        }
+        this.updateStatementBadge();
+        if (showAlert === true) alert('Data saved successfully!');
+    }
+
+    ensureMonthExists(month) {
+        if (!this.data.months[month]) {
+            this.data.months[month] = { data: {}, manual: {}, status: {}, meta: { created: new Date().toISOString() } };
+            const cats = this.getCategories();
+            const years = this.getYears();
+            cats.forEach(cat => {
+                this.data.months[month].data[cat.id] = {};
+                years.forEach(year => {
+                    this.data.months[month].data[cat.id][year] = {
+                        ob: 0, inst_dir: 0, inst_trf: 0,
+                        disp_con: 0, disp_uncon: 0, disp_trf: 0, disp_comm: 0,
+                        trf_in: 0, trf_out: 0
+                    };
+                });
+            });
+        }
+    }
+
+    getMonthData(month) {
+        this.ensureMonthExists(month);
+        return this.data.months[month];
+    }
+
+    renderDataEntry() {
+        const container = document.getElementById('dataEntryContainer');
+        container.innerHTML = '';
+        const monthData = this.getMonthData(this.currentMonth);
+        const allYears = this.getYears();
+        const cats = this.getCategories();
+
+        const groups = {};
+        cats.forEach(cat => {
+            if (!groups[cat.group]) groups[cat.group] = [];
+            groups[cat.group].push(cat);
+        });
+
+        Object.entries(groups).forEach(([groupName, groupCats]) => {
+            const section = document.createElement('div');
+            section.className = 'bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4';
+            const bodyId = 'body-' + groupName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g,'');
+            const iconId = 'icon-' + groupName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g,'');
+            const filterId = 'filter-' + groupName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g,'');
+
+            const currentYear = this.currentMonth.split('-')[0];
+            section.innerHTML = `
+                <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between cursor-pointer" 
+                     onclick="app.toggleSection('${bodyId}', '${iconId}')">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded">${groupCats.length}</span>
+                        <h3 class="font-bold text-slate-700">${groupName}</h3>
+                    </div>
+                    <i id="${iconId}" class="fas fa-chevron-down text-slate-400"></i>
+                </div>
+                <div id="${bodyId}">
+                    <div id="${filterId}" class="p-3 bg-slate-50 border-b border-slate-100">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <label class="text-xs font-semibold text-slate-600"><i class="fas fa-filter text-blue-500"></i> Year:</label>
+                            <select onchange="app.onGroupYearFilterChange('${groupName}', this)" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-blue-500">
+                                <option value="">-- Select --</option>
+                                <option value="all">All Years</option>
+                                ${allYears.slice().reverse().map(y => '<option value="' + y + '">' + y + '</option>').join('')}
+                            </select>
+                            <div class="flex gap-1 flex-wrap" id="tags-${filterId}"></div>
+                            <button onclick="app.setGroupYearFilter('${groupName}', ['` + currentYear + `'])" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded border border-blue-200">Current</button>
+                            <button onclick="app.setGroupYearFilter('${groupName}', 'all')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded border border-slate-200">All</button>
+                        </div>
+                    </div>
+                    ${groupCats.map(cat => this.renderCategoryTable(cat, allYears, monthData, groupName)).join('')}
+                </div>
+            `;
+            container.appendChild(section);
+            // Apply saved filter for this group
+            const saved = this.data.groupFilters && this.data.groupFilters[groupName];
+            if (saved) {
+                this.applyGroupYearFilterUI(groupName, saved);
+            } else {
+                this.setGroupYearFilter(groupName, [this.currentMonth.split('-')[0]]);
+            }
+        });
+    }
+
+    toggleSection(bodyId, iconId) {
+        const body = document.getElementById(bodyId);
+        const icon = document.getElementById(iconId);
+        if (!body || !icon) return;
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        } else {
+            body.style.display = 'none';
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        }
+    }
+
+    renderCategoryTable(cat, years, monthData, groupName) {
+        const catData = monthData.data[cat.id] || {};
+        const currentYear = this.currentMonth.split('-')[0];
+        const gf = (this.data.groupFilters && this.data.groupFilters[groupName]) || [currentYear];
+        const isAll = gf.includes('all');
+        // Keep duplicates: filter valid years but preserve duplicates from gf
+        const displayYears = isAll ? years : gf.filter(y => years.includes(y));
+        const finalYears = displayYears.length > 0 ? displayYears : [currentYear];
+
+        let rows = '';
+        finalYears.forEach(year => {
+            const d = catData[year] || { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_trf:0, disp_comm:0, trf_in:0, trf_out:0 };
+            const closing = this.calculateClosing(d);
+            rows += `<tr>
+                <td class="sticky-col bg-white border border-slate-200 px-2 py-1 font-medium text-slate-700">${year}</td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell" value="${d.ob}" onchange="app.updateCell('${cat.id}', '${year}', 'ob', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell bg-green-50" value="${d.inst_dir}" onchange="app.updateCell('${cat.id}', '${year}', 'inst_dir', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell bg-green-50" value="${d.inst_trf}" onchange="app.updateCell('${cat.id}', '${year}', 'inst_trf', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell bg-red-50" value="${d.disp_con}" onchange="app.updateCell('${cat.id}', '${year}', 'disp_con', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell bg-red-50" value="${d.disp_uncon}" onchange="app.updateCell('${cat.id}', '${year}', 'disp_uncon', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell bg-red-50" value="${d.disp_trf}" onchange="app.updateCell('${cat.id}', '${year}', 'disp_trf', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell bg-red-50" value="${d.disp_comm}" onchange="app.updateCell('${cat.id}', '${year}', 'disp_comm', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell bg-purple-50" value="${d.trf_in}" onchange="app.updateCell('${cat.id}', '${year}', 'trf_in', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-1 py-1"><input type="number" class="input-cell bg-purple-50" value="${d.trf_out}" onchange="app.updateCell('${cat.id}', '${year}', 'trf_out', this.value)" min="0"></td>
+                <td class="border border-slate-200 px-2 py-1 bg-slate-50 font-semibold text-center">${closing}</td>
+            </tr>`;
+        });
+
+        return `<div class="p-3 border-t border-slate-100" data-group="${groupName}">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="font-semibold text-sm text-slate-700">${cat.name}</h4>
+                <span class="text-xs text-slate-400">${cat.id}</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100">
+                            <th class="sticky-col bg-slate-100 border border-slate-200 px-2 py-1 text-left">Year</th>
+                            <th class="border border-slate-200 px-1 py-1">OB</th>
+                            <th class="border border-slate-200 px-1 py-1">Inst Dir</th>
+                            <th class="border border-slate-200 px-1 py-1">Inst Trf</th>
+                            <th class="border border-slate-200 px-1 py-1">Disp Con</th>
+                            <th class="border border-slate-200 px-1 py-1">Disp Uncon</th>
+                            <th class="border border-slate-200 px-1 py-1">Disp Trf</th>
+                            <th class="border border-slate-200 px-1 py-1">Disp Comm</th>
+                            <th class="border border-slate-200 px-1 py-1">Trf In</th>
+                            <th class="border border-slate-200 px-1 py-1">Trf Out</th>
+                            <th class="border border-slate-200 px-2 py-1">Closing</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    updateCell(catId, year, field, value) {
+        const monthData = this.getMonthData(this.currentMonth);
+        if (!monthData.data[catId]) monthData.data[catId] = {};
+        if (!monthData.data[catId][year]) monthData.data[catId][year] = { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_trf:0, disp_comm:0, trf_in:0, trf_out:0 };
+        monthData.data[catId][year][field] = parseInt(value) || 0;
+        this.saveData();
+        this.renderDataEntry();
+    }
+
+    calculateClosing(d) {
+        return (d.ob || 0) + (d.inst_dir || 0) + (d.inst_trf || 0) + (d.trf_in || 0) 
+             - (d.disp_con || 0) - (d.disp_uncon || 0) - (d.disp_trf || 0) - (d.disp_comm || 0) - (d.trf_out || 0);
+    }
+
+    onGroupYearFilterChange(groupName, select) {
+        const val = select.value;
+        if (!val) return;
+        if (!this.data.groupFilters) this.data.groupFilters = {};
+        let gf = this.data.groupFilters[groupName] || [];
+        if (val === 'all') {
+            gf = ['all'];
+        } else {
+            if (gf.includes('all')) gf = [];
+            gf.push(val); // Allow duplicates - same year multiple times
+        }
+        this.data.groupFilters[groupName] = gf;
+        this.saveData(false);
+        this.applyGroupYearFilterUI(groupName, gf);
+        this.refreshGroupTables(groupName);
+        select.value = ''; // Reset dropdown so same year can be selected again
+    }
+
+    removeGroupYearFilter(groupName, year) {
+        // Remove first occurrence only (for backward compatibility)
+        if (!this.data.groupFilters) this.data.groupFilters = {};
+        let gf = this.data.groupFilters[groupName] || [];
+        const idx = gf.indexOf(year);
+        if (idx > -1) gf.splice(idx, 1);
+        if (gf.length === 0) gf = ['all'];
+        this.data.groupFilters[groupName] = gf;
+        this.saveData(false);
+        this.applyGroupYearFilterUI(groupName, gf);
+        this.refreshGroupTables(groupName);
+    }
+
+    removeGroupYearFilterAt(groupName, index) {
+        if (!this.data.groupFilters) this.data.groupFilters = {};
+        let gf = this.data.groupFilters[groupName] || [];
+        if (index > -1 && index < gf.length) gf.splice(index, 1);
+        if (gf.length === 0) gf = ['all'];
+        this.data.groupFilters[groupName] = gf;
+        this.saveData(false);
+        this.applyGroupYearFilterUI(groupName, gf);
+        this.refreshGroupTables(groupName);
+    }
+
+    setGroupYearFilter(groupName, years) {
+        if (!this.data.groupFilters) this.data.groupFilters = {};
+        this.data.groupFilters[groupName] = Array.isArray(years) ? years : ['all'];
+        this.saveData(false);
+        this.applyGroupYearFilterUI(groupName, this.data.groupFilters[groupName]);
+        this.refreshGroupTables(groupName);
+    }
+
+    applyGroupYearFilterUI(groupName, gf) {
+        const filterId = 'filter-' + groupName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g,'');
+        const tagsDiv = document.getElementById('tags-' + filterId);
+        if (!tagsDiv) return;
+        const allYears = this.getYears();
+        const isAll = gf.includes('all');
+        if (isAll) {
+            tagsDiv.innerHTML = '<span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full border border-slate-200">All Years</span>';
+        } else {
+            tagsDiv.innerHTML = gf.map((y, idx) => {
+                if (!allYears.includes(y)) return '';
+                return '<span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">' + y + ' <button onclick="app.removeGroupYearFilterAt(\'' + groupName + '\', ' + idx + ')" class="text-blue-500 hover:text-blue-700 leading-none"><i class="fas fa-times text-[10px]"></i></button></span>';
+            }).join('');
+        }
+    }
+
+    refreshGroupTables(groupName) {
+        const monthData = this.getMonthData(this.currentMonth);
+        const allYears = this.getYears();
+        const currentYear = this.currentMonth.split('-')[0];
+        const gf = (this.data.groupFilters && this.data.groupFilters[groupName]) || [currentYear];
+        const isAll = gf.includes('all');
+        // For duplicates: keep the array as-is (with duplicates), filter out invalid years
+        const displayYears = isAll ? allYears : gf.filter(y => allYears.includes(y));
+        const finalYears = displayYears.length > 0 ? displayYears : [currentYear];
+
+        const bodyId = 'body-' + groupName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g,'');
+        const body = document.getElementById(bodyId);
+        if (!body) return;
+        const cats = this.getCategories().filter(c => c.group === groupName);
+        // Re-render only the category tables inside this group, keep the filter bar
+        const filterBar = body.querySelector('[id^="filter-"]');
+        const newTables = cats.map(cat => this.renderCategoryTable(cat, allYears, monthData, groupName)).join('');
+        // Remove old tables but keep filter bar
+        Array.from(body.children).forEach(child => {
+            if (!child.id || !child.id.startsWith('filter-')) body.removeChild(child);
+        });
+        // Insert new tables after filter bar
+        const temp = document.createElement('div');
+        temp.innerHTML = newTables;
+        while (temp.firstChild) {
+            body.appendChild(temp.firstChild);
+        }
+    }
+
+    addYear() {
+        const newYear = prompt('Enter year to add (e.g., 2027):');
+        if (newYear && /^\d{4}$/.test(newYear)) {
+            const years = this.getYears();
+            if (!years.includes(newYear)) {
+                years.push(newYear);
+                years.sort();
+                this.data.years = years;
+                Object.values(this.data.months).forEach(monthData => {
+                    this.getCategories().forEach(cat => {
+                        if (!monthData.data[cat.id]) monthData.data[cat.id] = {};
+                        if (!monthData.data[cat.id][newYear]) {
+                            monthData.data[cat.id][newYear] = { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_trf:0, disp_comm:0, trf_in:0, trf_out:0 };
+                        }
+                    });
+                });
+                this.saveData();
+                this.renderDataEntry();
+                this.renderSettings();
+            }
+        }
+    }
+
+    removeYear(year) {
+        if (!confirm('Remove year ' + year + '? Data for this year will be lost!')) return;
+        const years = this.getYears().filter(y => y !== year);
+        this.data.years = years;
+        Object.values(this.data.months).forEach(monthData => {
+            Object.keys(monthData.data).forEach(catId => {
+                if (monthData.data[catId]) delete monthData.data[catId][year];
+            });
+        });
+        this.saveData();
+        this.renderDataEntry();
+        this.renderSettings();
+    }
+
+    toggleCategoryForm() {
+        const form = document.getElementById('categoryForm');
+        form.classList.toggle('hidden');
+    }
+
+    addCategory() {
+        const id = document.getElementById('newCatId').value.trim();
+        const group = document.getElementById('newCatGroup').value.trim();
+        const name = document.getElementById('newCatName').value.trim();
+        if (!id || !group || !name) { alert('Please fill all fields'); return; }
+        const cats = this.getCategories();
+        if (cats.find(c => c.id === id)) { alert('Category ID already exists'); return; }
+        cats.push({ id, group, name });
+        this.data.categories = cats;
+        Object.values(this.data.months).forEach(monthData => {
+            if (!monthData.data[id]) monthData.data[id] = {};
+            this.getYears().forEach(year => {
+                if (!monthData.data[id][year]) monthData.data[id][year] = { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_trf:0, disp_comm:0, trf_in:0, trf_out:0 };
+            });
+        });
+        this.saveData();
+        this.renderDataEntry();
+        this.renderSettings();
+        document.getElementById('newCatId').value = '';
+        document.getElementById('newCatGroup').value = '';
+        document.getElementById('newCatName').value = '';
+    }
+
+    removeCategory(catId) {
+        if (!confirm('Remove category ' + catId + '? All data will be lost!')) return;
+        const cats = this.getCategories().filter(c => c.id !== catId);
+        this.data.categories = cats;
+        Object.values(this.data.months).forEach(monthData => {
+            delete monthData.data[catId];
+        });
+        this.saveData();
+        this.renderDataEntry();
+        this.renderSettings();
+    }
+
+    renderSettings() {
+        const cats = this.getCategories();
+        const years = this.getYears();
+
+        const tbody = document.getElementById('categoriesTable');
+        tbody.innerHTML = cats.map(cat => `
+            <tr class="border-b border-slate-100">
+                <td class="px-2 py-1 font-mono text-xs">${cat.id}</td>
+                <td class="px-2 py-1">${cat.group}</td>
+                <td class="px-2 py-1">${cat.name}</td>
+                <td class="px-2 py-1 text-center">
+                    <button onclick="app.removeCategory('${cat.id}')" class="text-red-600 hover:text-red-800 text-xs">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        const ylist = document.getElementById('yearsList');
+        ylist.innerHTML = years.map(y => `
+            <span class="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 rounded px-2 py-1 text-sm">
+                ${y}
+                <button onclick="app.removeYear('${y}')" class="text-red-500 hover:text-red-700"><i class="fas fa-times text-xs"></i></button>
+            </span>
+        `).join('');
+    }
+
+    carryForward() {
+        const [y, m] = this.currentMonth.split('-').map(Number);
+        let prevY = y, prevM = m - 1;
+        if (prevM === 0) { prevY--; prevM = 12; }
+        const prevMonth = `${prevY}-${String(prevM).padStart(2,'0')}`;
+        if (!this.data.months[prevMonth]) {
+            alert('No previous month data found (' + prevMonth + ')');
+            return;
+        }
+        const prevData = this.data.months[prevMonth].data;
+        const currData = this.getMonthData(this.currentMonth).data;
+        this.getCategories().forEach(cat => {
+            this.getYears().forEach(year => {
+                const prev = prevData[cat.id] && prevData[cat.id][year];
+                if (prev) {
+                    const closing = this.calculateClosing(prev);
+                    if (!currData[cat.id]) currData[cat.id] = {};
+                    if (!currData[cat.id][year]) currData[cat.id][year] = { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_trf:0, disp_comm:0, trf_in:0, trf_out:0 };
+                    currData[cat.id][year].ob = closing;
+                }
+            });
+        });
+        this.saveData();
+        this.renderDataEntry();
+        alert(`Opening balances carried forward from ${prevMonth}`);
+    }
+
+    clearAllData() {
+        if (confirm('Clear ALL data for ' + this.currentMonth + '?')) {
+            delete this.data.months[this.currentMonth];
+            this.ensureMonthExists(this.currentMonth);
+            this.saveData();
+            this.renderDataEntry();
+        }
+    }
+
+    updateStatementBadge() {
+        const monthData = this.getMonthData(this.currentMonth);
+        let ready = 0;
+        STATEMENTS.forEach(stmt => {
+            if (monthData.status[stmt.id] === 'ready') ready++;
+        });
+        const badge = document.getElementById('stmtBadge');
+        badge.textContent = `${ready}/${STATEMENTS.length}`;
+        badge.className = ready === STATEMENTS.length 
+            ? 'bg-emerald-500 text-white text-xs rounded-full px-2 py-0.5 ml-1'
+            : 'bg-red-500 text-white text-xs rounded-full px-2 py-0.5 ml-1';
+    }
+
+    renderStatementsDashboard() {
+        const grid = document.getElementById('statementsGrid');
+        const monthData = this.getMonthData(this.currentMonth);
+        grid.innerHTML = STATEMENTS.map(stmt => {
+            const isReady = monthData.status[stmt.id] === 'ready';
+            const hasData = this.checkStatementData();
+            const statusClass = isReady ? 'status-green' : (hasData ? 'status-yellow' : 'status-red');
+            const statusText = isReady ? 'Ready' : (hasData ? 'Pending Review' : 'No Data');
+            const icon = isReady ? 'fa-check-circle' : (hasData ? 'fa-clock' : 'fa-circle-exclamation');
+            return `<div onclick="app.openStatement('${stmt.id}')" class="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-10 h-10 rounded-lg ${isReady ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'} flex items-center justify-center">
+                            <i class="fas ${icon} text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm">${stmt.name}</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">${stmt.desc}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between">
+                    <span class="text-xs px-2 py-1 rounded-full ${statusClass} font-medium">${statusText}</span>
+                    <span class="text-xs text-slate-400">${stmt.auto ? 'Auto' : 'Manual'}</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    checkStatementData() {
+        const monthData = this.getMonthData(this.currentMonth);
+        return Object.values(monthData.data).some(catData => 
+            Object.values(catData).some(yearData => (yearData.ob || 0) > 0 || (yearData.inst_dir || 0) > 0)
+        );
+    }
+
+    openStatement(stmtId) {
+        this.currentStatement = stmtId;
+        const stmt = STATEMENTS.find(s => s.id === stmtId);
+        document.getElementById('modalTitle').textContent = stmt.name;
+        document.getElementById('modalSubtitle').textContent = `Month: ${this.formatMonth(this.currentMonth)} | ACJM Baghpat`;
+        const content = document.getElementById('modalContent');
+        content.innerHTML = '<div class="flex items-center justify-center h-64"><i class="fas fa-spinner fa-spin text-3xl text-blue-600"></i></div>';
+        document.getElementById('statementModal').classList.remove('hidden');
+        setTimeout(() => {
+            content.innerHTML = this.generateStatementHTML(stmtId);
+            this.getMonthData(this.currentMonth).status[stmtId] = 'ready';
+            this.saveData();
+            this.updateStatementBadge();
+        }, 100);
+    }
+
+    closeModal() {
+        document.getElementById('statementModal').classList.add('hidden');
+        this.currentStatement = null;
+    }
+
+    formatMonth(monthStr) {
+        const [y, m] = monthStr.split('-');
+        const date = new Date(y, m-1);
+        return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    generateStatementHTML(stmtId) {
+        switch(stmtId) {
+            case 'pendency_arrears': return this.genPendencyArrears();
+            case 'ni_act_breakup': return this.genNIActBreakup();
+            case 'breakup': return this.genBreakup();
+            case 'contested': return this.genContested();
+            case 'actual_dispo': return this.genActualDispo();
+            case 'apar_dj': return this.genAparDJ();
+            case 'rape_mp_mla': return this.genRapeMPMLA();
+            case 'ndps': return this.genNDPS();
+            case 'petty_ni': return this.genPettyNI();
+            case 's3': return this.genS3();
+            case 'information': return this.genInformation();
+            case 'mission_mode': return this.genMissionMode();
+            case 'monthly_petty_acd': return this.genMonthlyPettyACD();
+            case 'monthly_third': return this.genMonthlyThird();
+            case 'monthly_first': return this.genMonthlyFirst();
+            case 'monthly_second': return this.genMonthlySecond();
+            case 'quota': return this.genQuota();
+            case 'quarter_sh': return this.genQuarterSH();
+            case 'quarterly_inst_dispo': return this.genQuarterlyInstDispo();
+            case 'crpc_299': return this.genCrpc299();
+            case 'seven_year_old': return this.genSevenYearOld();
+            case 'new_quarterly': return this.genNewQuarterly();
+            case 'ni_quarterly': return this.genNIQuarterly();
+            case 'half_yearly_1': return this.genHalfYearly1();
+            case 'half_yearly_2': return this.genHalfYearly2();
+            case 'yearly': return this.genYearly();
+            default: return '<p>Statement not implemented yet.</p>';
+        }
+    }
+
+    sumCategories(monthData, catIds, field) {
+        let total = 0;
+        catIds.forEach(catId => {
+            const catData = monthData.data[catId] || {};
+            Object.values(catData).forEach(yearData => {
+                if (field === 'inst_all') {
+                    total += (yearData.inst_dir || 0) + (yearData.inst_trf || 0);
+                } else if (field === 'disp_all') {
+                    total += (yearData.disp_con || 0) + (yearData.disp_uncon || 0) + (yearData.disp_comm || 0);
+                } else {
+                    total += (yearData[field] || 0);
+                }
+            });
+        });
+        return total;
+    }
+
+    sumClosing(monthData, catIds) {
+        let total = 0;
+        catIds.forEach(catId => {
+            const catData = monthData.data[catId] || {};
+            Object.values(catData).forEach(yearData => {
+                total += this.calculateClosing(yearData);
+            });
+        });
+        return total;
+    }
+
+    manualCell(key, val='') {
+        return `<td data-manual="${key}" contenteditable="true" class="manual-cell">${val || '-'}</td>`;
+    }
+
+    genPendencyArrears() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const frCats = ['fr'];
+        const otherCats = this.getCategories().filter(c => c.id !== 'fr').map(c => c.id);
+        const preOb = this.sumCategories(monthData, frCats, 'ob');
+        const preInstDir = this.sumCategories(monthData, frCats, 'inst_dir');
+        const preInstTrf = this.sumCategories(monthData, frCats, 'inst_trf');
+        const preDisp = this.sumCategories(monthData, frCats, 'disp_con') + this.sumCategories(monthData, frCats, 'disp_uncon') + this.sumCategories(monthData, frCats, 'disp_comm');
+        const preDispTrf = this.sumCategories(monthData, frCats, 'disp_trf') + this.sumCategories(monthData, frCats, 'trf_out');
+        const preClosing = this.sumClosing(monthData, frCats);
+        const exOb = this.sumCategories(monthData, otherCats, 'ob');
+        const exInstDir = this.sumCategories(monthData, otherCats, 'inst_dir');
+        const exInstTrf = this.sumCategories(monthData, otherCats, 'inst_trf');
+        const exDisp = this.sumCategories(monthData, otherCats, 'disp_con') + this.sumCategories(monthData, otherCats, 'disp_uncon') + this.sumCategories(monthData, otherCats, 'disp_comm');
+        const exDispTrf = this.sumCategories(monthData, otherCats, 'disp_trf') + this.sumCategories(monthData, otherCats, 'trf_out');
+        const exClosing = this.sumClosing(monthData, otherCats);
+        const totalOb = preOb + exOb;
+        const totalInstDir = preInstDir + exInstDir;
+        const totalInstTrf = preInstTrf + exInstTrf;
+        const totalDisp = preDisp + exDisp;
+        const totalDispTrf = preDispTrf + exDispTrf;
+        const totalClosing = preClosing + exClosing;
+        return `<div class="space-y-4">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                <i class="fas fa-info-circle"></i> Pre-trial cases include only <strong>Final Reports (FR)</strong>. All other categories are "Excluding Pre-trial".
+            </div>
+            <table class="statement-table w-full">
+                <thead>
+                    <tr>
+                        <th rowspan="2">Category</th>
+                        <th colspan="3">Opening Balance</th>
+                        <th colspan="3">Institution During Month</th>
+                        <th colspan="3">Disposal During Month</th>
+                        <th colspan="3">Closing Balance</th>
+                        <th colspan="2">5+ Yrs Disp</th>
+                        <th colspan="2">5+ Yrs Pen</th>
+                    </tr>
+                    <tr>
+                        <th>Civil</th><th>Criminal</th><th>Total</th>
+                        <th>Civil</th><th>Criminal</th><th>Total</th>
+                        <th>Civil</th><th>Criminal</th><th>Total</th>
+                        <th>Civil</th><th>Criminal</th><th>Total</th>
+                        <th>Civil</th><th>Criminal</th>
+                        <th>Civil</th><th>Criminal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-left font-semibold">Pendency (Excl Pre-trial)</td>
+                        <td>-</td><td>${exOb}</td><td>${exOb}</td>
+                        <td>-</td><td>${exInstDir + exInstTrf}</td><td>${exInstDir + exInstTrf}</td>
+                        <td>-</td><td>${exDisp}</td><td>${exDisp}</td>
+                        <td>-</td><td>${exDispTrf}</td><td>${exDispTrf}</td>
+                        <td>-</td><td>${exClosing}</td><td>${exClosing}</td>
+                        <td>-</td><td>-</td><td>-</td><td>-</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left font-semibold">Pre-trial Cases (FR)</td>
+                        <td>-</td><td>${preOb}</td><td>${preOb}</td>
+                        <td>-</td><td>${preInstDir + preInstTrf}</td><td>${preInstDir + preInstTrf}</td>
+                        <td>-</td><td>${preDisp}</td><td>${preDisp}</td>
+                        <td>-</td><td>${preDispTrf}</td><td>${preDispTrf}</td>
+                        <td>-</td><td>${preClosing}</td><td>${preClosing}</td>
+                        <td>-</td><td>-</td><td>-</td><td>-</td>
+                    </tr>
+                    <tr class="bg-slate-100 font-bold">
+                        <td class="text-left">TOTAL</td>
+                        <td>-</td><td>${totalOb}</td><td>${totalOb}</td>
+                        <td>-</td><td>${totalInstDir + totalInstTrf}</td><td>${totalInstDir + totalInstTrf}</td>
+                        <td>-</td><td>${totalDisp}</td><td>${totalDisp}</td>
+                        <td>-</td><td>${totalDispTrf}</td><td>${totalDispTrf}</td>
+                        <td>-</td><td>${totalClosing}</td><td>${totalClosing}</td>
+                        <td>-</td><td>-</td><td>-</td><td>-</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="text-sm text-slate-600 mt-2">Compiled By:- _________________ &nbsp;&nbsp;&nbsp; Checked By:- _________________ &nbsp;&nbsp;&nbsp; ACJM BAGHPAT</div>
+        </div>`;
+    }
+
+    genNIActBreakup() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const niCat = 'summons_complaint_ni';
+        const catData = monthData.data[niCat] || {};
+        let rows = '';
+        let totalOb = 0, totalInst = 0, totalDisp = 0, totalClosing = 0;
+        this.getYears().forEach(year => {
+            const d = catData[year] || { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_trf:0, disp_comm:0, trf_in:0, trf_out:0 };
+            const inst = (d.inst_dir || 0) + (d.inst_trf || 0) + (d.trf_in || 0);
+            const disp = (d.disp_con || 0) + (d.disp_uncon || 0) + (d.disp_trf || 0) + (d.disp_comm || 0) + (d.trf_out || 0);
+            const closing = this.calculateClosing(d);
+            totalOb += (d.ob || 0); totalInst += inst; totalDisp += disp; totalClosing += closing;
+            rows += `<tr><td class="text-left">${year}</td><td>${d.ob || 0}</td><td>${inst}</td><td>${disp}</td><td>${closing}</td></tr>`;
+        });
+        return `<table class="statement-table w-full">
+            <thead><tr><th>Year</th><th>Opening</th><th>Institution</th><th>Disposal</th><th>Closing</th></tr></thead>
+            <tbody>${rows}<tr class="bg-slate-100 font-bold"><td class="text-left">TOTAL</td><td>${totalOb}</td><td>${totalInst}</td><td>${totalDisp}</td><td>${totalClosing}</td></tr></tbody>
+        </table>`;
+    }
+
+    genBreakup() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const cats = this.getCategories();
+        const rowDefs = [
+            { name: 'Criminal Warrant Trail Cases (Both Police repoert and Complaints)', cats: cats.filter(c => c.group === 'W/S State' || c.group === 'W/S Complaint').map(c => c.id) },
+            { name: 'Criminal Summon Trial Cases (Both Police Report and Complaints)', cats: cats.filter(c => c.group === 'Summons State' || c.group === 'Summons Complaint').map(c => c.id) },
+            { name: 'Criminal Summary trial (Excluding challan under Motor Vehicles Act)', cats: ['wm_challan'] },
+            { name: 'Petty Offences (Inclusive challan under Motor Vehicle Act)', cats: ['mv_act', 'other_challan'] },
+            { name: 'Cases under Domestic Violence Act, 2005', cats: [], manual: true },
+            { name: 'Final Reports', cats: ['fr'] },
+            { name: 'Criminal Miscellaneoous (Excluding Applications under Section 156(3) CRPC', cats: ['crim_misc_other'] },
+            { name: 'Applications under Section 156(3) CRPC', cats: [], manual: true },
+            { name: 'Other Magistrate Cases (Not mentioned above)', cats: ['crim_misc_173', 'bail'] }
+        ];
+        let html = '<table class="statement-table w-full"><thead><tr><th class="text-left">S.N.</th><th class="text-left">Nature of Cases</th>';
+        this.getYears().forEach(y => html += `<th>${y}</th>`);
+        html += '<th>Total</th></tr></thead><tbody>';
+        rowDefs.forEach((row, rowIdx) => {
+            html += `<tr><td class="text-left">${rowIdx+1}</td><td class="text-left font-medium">${row.name}</td>`;
+            let rowTotal = 0;
+            this.getYears().forEach(year => {
+                let sum = 0;
+                if (!row.manual) {
+                    row.cats.forEach(catId => {
+                        const d = monthData.data[catId] && monthData.data[catId][year] ? monthData.data[catId][year] : {};
+                        sum += this.calculateClosing(d);
+                    });
+                } else {
+                    const manualKey = `breakup_m_${rowIdx}_${year}`;
+                    sum = monthData.manual[manualKey] || 0;
+                }
+                rowTotal += sum;
+                const cellId = row.manual ? `data-manual="breakup_m_${rowIdx}_${year}" contenteditable="true" class="manual-cell"` : '';
+                html += `<td ${cellId}>${sum || '-'}</td>`;
+            });
+            html += `<td class="font-bold">${rowTotal || '-'}</td></tr>`;
+        });
+        html += `<tr class="bg-slate-100 font-bold"><td></td><td class="text-left">TOTAL</td>`;
+        let grandTotal = 0;
+        this.getYears().forEach(year => {
+            let sum = 0;
+            cats.forEach(cat => {
+                const d = monthData.data[cat.id] && monthData.data[cat.id][year] ? monthData.data[cat.id][year] : {};
+                sum += this.calculateClosing(d);
+            });
+            rowDefs.forEach((row, rowIdx) => {
+                if (row.manual) sum += (monthData.manual[`breakup_m_${rowIdx}_${year}`] || 0);
+            });
+            grandTotal += sum;
+            html += `<td>${sum}</td>`;
+        });
+        html += `<td>${grandTotal}</td></tr></tbody></table>`;
+        return html;
+    }
+
+    genContested() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const cats = this.getCategories();
+        const mainCats = cats.filter(c => c.group !== 'Bail' && c.group !== 'Final Report' && c.group !== 'Criminal Misc').map(c => c.id);
+        const miscCats = cats.filter(c => c.group === 'Bail' || c.group === 'Final Report' || c.group === 'Criminal Misc').map(c => c.id);
+        const genTable = (catIds, title) => {
+            let rows = '';
+            let totals = { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_comm:0, disp_trf:0, closing:0 };
+            this.getYears().forEach(year => {
+                let ob=0, idir=0, itr=0, dc=0, du=0, dm=0, dt=0;
+                catIds.forEach(catId => {
+                    const d = monthData.data[catId] && monthData.data[catId][year] ? monthData.data[catId][year] : {};
+                    ob += (d.ob || 0); 
+                    idir += (d.inst_dir || 0); 
+                    itr += (d.inst_trf || 0) + (d.trf_in || 0);
+                    dc += (d.disp_con || 0); 
+                    du += (d.disp_uncon || 0); 
+                    dm += (d.disp_comm || 0); 
+                    dt += (d.disp_trf || 0) + (d.trf_out || 0);
+                });
+                const closing = ob + idir + itr - dc - du - dm - dt;
+                totals.ob += ob; totals.inst_dir += idir; totals.inst_trf += itr;
+                totals.disp_con += dc; totals.disp_uncon += du; totals.disp_comm += dm; totals.disp_trf += dt;
+                totals.closing += closing;
+                rows += `<tr><td class="text-left">${year}</td><td>${ob}</td><td>${idir}</td><td>${itr}</td><td>${dc}</td><td>${du}</td><td>${dm}</td><td>${dt}</td><td class="font-semibold">${closing}</td></tr>`;
+            });
+            return `<h4 class="font-bold text-slate-700 mb-2 mt-4">${title}</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th>Year</th><th>Opening</th><th>Inst Direct</th><th>Inst Trf</th><th>Disp Contested</th><th>Disp Non-Contested</th><th>Disp Committal</th><th>Disp Transfer</th><th>Closing</th></tr></thead>
+                <tbody>${rows}<tr class="bg-slate-100 font-bold"><td class="text-left">TOTAL</td><td>${totals.ob}</td><td>${totals.inst_dir}</td><td>${totals.inst_trf}</td><td>${totals.disp_con}</td><td>${totals.disp_uncon}</td><td>${totals.disp_comm}</td><td>${totals.disp_trf}</td><td>${totals.closing}</td></tr></tbody>
+            </table>`;
+        };
+        return `<div class="space-y-2">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-3">
+                <i class="fas fa-info-circle"></i> Criminal Cases = All except Bail, FR, Criminal Misc. Criminal Misc = Bail + FR + Criminal Misc categories.
+            </div>
+            ${genTable(mainCats, 'CRIMINAL CASES (Excluding Bail, FR, CMC)')}
+            ${genTable(miscCats, 'CRIMINAL MISC CASES (Bail, FR, CMC)')}
+        </div>`;
+    }
+
+    genActualDispo() {
+        const monthData = this.getMonthData(this.currentMonth);
+        let rows = '';
+        let totalCriminal = 0;
+        this.getYears().forEach(year => {
+            let crimDisp = 0;
+            this.getCategories().forEach(cat => {
+                const d = monthData.data[cat.id] && monthData.data[cat.id][year] ? monthData.data[cat.id][year] : {};
+                crimDisp += (d.disp_con || 0) + (d.disp_uncon || 0) + (d.disp_comm || 0);
+            });
+            totalCriminal += crimDisp;
+            rows += `<tr><td class="text-left">${year}</td><td>--</td><td>${crimDisp}</td><td class="font-bold">${crimDisp}</td></tr>`;
+        });
+        return `<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 mb-3">
+            <i class="fas fa-lightbulb"></i> Derived automatically from Contested + Non-Contested + Committal disposal across all categories.
+        </div>
+        <table class="statement-table w-full">
+            <thead><tr><th>Year</th><th>Civil Disposal</th><th>Criminal Disposal</th><th>Total</th></tr></thead>
+            <tbody>${rows}<tr class="bg-slate-100 font-bold"><td class="text-left">TOTAL</td><td>--</td><td>${totalCriminal}</td><td>${totalCriminal}</td></tr></tbody>
+        </table>`;
+    }
+
+    genAparDJ() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const calcRange = (years) => {
+            let open = 0, inst = 0, disp = 0, dispTrf = 0;
+            years.forEach(year => {
+                this.getCategories().forEach(cat => {
+                    const d = monthData.data[cat.id] && monthData.data[cat.id][year] ? monthData.data[cat.id][year] : {};
+                    open += (d.ob || 0);
+                    inst += (d.inst_trf || 0) + (d.trf_in || 0);
+                    disp += (d.disp_con || 0) + (d.disp_uncon || 0) + (d.disp_comm || 0);
+                    dispTrf += (d.disp_trf || 0) + (d.trf_out || 0);
+                });
+            });
+            const close = open + inst - disp - dispTrf;
+            return { open, inst, disp, dispTrf, close };
+        };
+        const r5_10 = calcRange(APAR_RANGES['5-10']);
+        const r10_20 = calcRange(APAR_RANGES['10-20']);
+        const r20_30 = calcRange(APAR_RANGES['20-30']);
+        const oldYears = this.getYears().filter(y => parseInt(y) <= 1993);
+        const r30 = calcRange(oldYears);
+        const row = (label, data) => `<tr>
+            <td class="text-left font-medium">${label}</td>
+            <td>${data.open}</td><td>-</td><td>${data.open}</td>
+            <td>${data.inst}</td><td>-</td><td>${data.inst}</td>
+            <td>${data.disp}</td><td>-</td><td>${data.disp}</td>
+            <td>${data.dispTrf}</td><td>-</td><td>${data.dispTrf}</td>
+            <td>${data.close}</td><td>-</td><td>${data.close}</td>
+        </tr>`;
+        return `<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-3">
+            <i class="fas fa-info-circle"></i> Year ranges: 5-10 yrs (2014-19), 10-20 yrs (2005-13), 20-30 yrs (1994-04), 30+ yrs (1993 & before).
+        </div>
+        <table class="statement-table w-full text-xs">
+            <thead>
+                <tr><th rowspan="2">Age Range</th><th colspan="3">Opening</th><th colspan="3">Inst by Trf</th><th colspan="3">Disp (Actual)</th><th colspan="3">Disp by Trf</th><th colspan="3">Closing</th></tr>
+                <tr><th>Crl</th><th>Civ</th><th>Tot</th><th>Crl</th><th>Civ</th><th>Tot</th><th>Crl</th><th>Civ</th><th>Tot</th><th>Crl</th><th>Civ</th><th>Tot</th><th>Crl</th><th>Civ</th><th>Tot</th></tr>
+            </thead>
+            <tbody>
+                ${row('5-10 years old (2014-19)', r5_10)}
+                ${row('10-20 years old (2005-13)', r10_20)}
+                ${row('20-30 years old (1994-04)', r20_30)}
+                ${row('More than 30 years', r30)}
+            </tbody>
+        </table>`;
+    }
+
+    genRapeMPMLA() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const rapeCats = ['ws_state_committal_rape', 'ws_state_sh'];
+        const mlaCats = ['ws_state_mp_mla'];
+        const sumField = (cats, field) => {
+            let sum = 0;
+            cats.forEach(catId => {
+                const catData = monthData.data[catId] || {};
+                Object.values(catData).forEach(d => {
+                    if (field === 'inst_all') sum += (d.inst_dir || 0) + (d.inst_trf || 0);
+                    else if (field === 'disp_all') sum += (d.disp_con || 0) + (d.disp_uncon || 0) + (d.disp_comm || 0);
+                    else sum += (d[field] || 0);
+                });
+            });
+            return sum;
+        };
+        const rapeOpen = sumField(rapeCats, 'ob');
+        const rapeInst = sumField(rapeCats, 'inst_all');
+        const rapeDisp = sumField(rapeCats, 'disp_all');
+        const rapeClose = rapeOpen + rapeInst - rapeDisp - sumField(rapeCats, 'disp_trf') - sumField(rapeCats, 'trf_out');
+        const mlaOpen = sumField(mlaCats, 'ob');
+        const mlaInst = sumField(mlaCats, 'inst_all');
+        const mlaDisp = sumField(mlaCats, 'disp_all');
+        const mlaClose = mlaOpen + mlaInst - mlaDisp - sumField(mlaCats, 'disp_trf') - sumField(mlaCats, 'trf_out');
+        return `<table class="statement-table w-full">
+            <thead><tr><th>Category</th><th>Opening</th><th>Institution (Actual)</th><th>Institution (Trf)</th><th>Disposal (Actual)</th><th>Disposal (Trf)</th><th>Closing</th></tr></thead>
+            <tbody>
+                <tr><td class="text-left font-medium">Sexual Offences (Rape + POCSO + SH)</td><td>${rapeOpen}</td><td>${sumField(rapeCats, 'inst_dir')}</td><td>${sumField(rapeCats, 'inst_trf')}</td><td>${rapeDisp}</td><td>${sumField(rapeCats, 'disp_trf') + sumField(rapeCats, 'trf_out')}</td><td class="font-bold">${rapeClose}</td></tr>
+                <tr><td class="text-left font-medium">MP/MLA Cases</td><td>${mlaOpen}</td><td>${sumField(mlaCats, 'inst_dir')}</td><td>${sumField(mlaCats, 'inst_trf')}</td><td>${mlaDisp}</td><td>${sumField(mlaCats, 'disp_trf') + sumField(mlaCats, 'trf_out')}</td><td class="font-bold">${mlaClose}</td></tr>
+            </tbody>
+        </table>
+        <div class="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+            <i class="fas fa-pen"></i> <strong>Note:</strong> This statement is derived from your entries.
+        </div>`;
+    }
+
+    genNDPS() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const ndpsCat = 'ws_state_ndps';
+        const catData = monthData.data[ndpsCat] || {};
+        let rows = '';
+        let totalOpen = 0, totalInst = 0, totalDisp = 0, totalClose = 0;
+        this.getYears().forEach(year => {
+            const d = catData[year] || { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_trf:0, disp_comm:0, trf_in:0, trf_out:0 };
+            const inst = (d.inst_dir || 0) + (d.inst_trf || 0) + (d.trf_in || 0);
+            const disp = (d.disp_con || 0) + (d.disp_uncon || 0) + (d.disp_trf || 0) + (d.disp_comm || 0) + (d.trf_out || 0);
+            const close = this.calculateClosing(d);
+            totalOpen += (d.ob || 0); totalInst += inst; totalDisp += disp; totalClose += close;
+            rows += `<tr><td class="text-left">${year}</td><td>${d.ob || 0}</td><td>${inst}</td><td>${disp}</td><td class="font-semibold">${close}</td></tr>`;
+        });
+        return `<table class="statement-table w-full">
+            <thead><tr><th>Year</th><th>Opening Balance</th><th>Institution</th><th>Disposal</th><th>Closing Balance</th></tr></thead>
+            <tbody>${rows}<tr class="bg-slate-100 font-bold"><td class="text-left">TOTAL</td><td>${totalOpen}</td><td>${totalInst}</td><td>${totalDisp}</td><td>${totalClose}</td></tr></tbody>
+        </table>`;
+    }
+
+    genPettyNI() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const mvData = monthData.data['mv_act'] || {};
+        const ocData = monthData.data['other_challan'] || {};
+        const niData = monthData.data['summons_complaint_ni'] || {};
+        const calcRow = (data, name) => {
+            let ob=0, inst=0, disp=0;
+            Object.values(data).forEach(d => {
+                ob += (d.ob || 0);
+                inst += (d.inst_dir || 0) + (d.inst_trf || 0) + (d.trf_in || 0);
+                disp += (d.disp_con || 0) + (d.disp_uncon || 0) + (d.disp_trf || 0) + (d.disp_comm || 0) + (d.trf_out || 0);
+            });
+            const close = ob + inst - disp;
+            return `<tr><td class="text-left font-medium">${name}</td><td>${ob || '-'}</td><td>${inst || '-'}</td><td>${disp || '-'}</td><td class="font-bold">${close || '-'}</td></tr>`;
+        };
+        return `<table class="statement-table w-full">
+            <thead><tr><th>Nature of Cases</th><th>Opening</th><th>Institution</th><th>Disposal</th><th>Closing</th></tr></thead>
+            <tbody>
+                <tr><td class="text-left font-medium">Old criminal cases involving petty Offences prior to the year 2000</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                ${calcRow(mvData, 'Traffic Challan')}
+                ${calcRow(ocData, 'Municipal Challan')}
+                ${calcRow(niData, 'Complaint Cases u/s 138 N.I. Act')}
+            </tbody>
+        </table>`;
+    }
+
+    genS3() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const rapeCats = ['ws_state_committal_rape', 'ws_state_sh'];
+        const committalCats = ['ws_state_committal_rape', 'ws_state_committal_other'];
+        const mvCats = ['mv_act'];
+        const niCats = ['summons_complaint_ni'];
+        const sumClosing = (cats) => {
+            let sum = 0;
+            cats.forEach(catId => {
+                const catData = monthData.data[catId] || {};
+                Object.values(catData).forEach(d => sum += this.calculateClosing(d));
+            });
+            return sum;
+        };
+        const sumOb = (cats) => {
+            let sum = 0;
+            cats.forEach(catId => {
+                const catData = monthData.data[catId] || {};
+                Object.values(catData).forEach(d => sum += (d.ob || 0));
+            });
+            return sum;
+        };
+        const sumInst = (cats) => {
+            let sum = 0;
+            cats.forEach(catId => {
+                const catData = monthData.data[catId] || {};
+                Object.values(catData).forEach(d => sum += (d.inst_dir || 0) + (d.inst_trf || 0) + (d.trf_in || 0));
+            });
+            return sum;
+        };
+        const sumDisp = (cats) => {
+            let sum = 0;
+            cats.forEach(catId => {
+                const catData = monthData.data[catId] || {};
+                Object.values(catData).forEach(d => sum += (d.disp_con || 0) + (d.disp_uncon || 0) + (d.disp_comm || 0));
+            });
+            return sum;
+        };
+        const sumTrf = (cats) => {
+            let sum = 0;
+            cats.forEach(catId => {
+                const catData = monthData.data[catId] || {};
+                Object.values(catData).forEach(d => sum += (d.disp_trf || 0) + (d.trf_out || 0));
+            });
+            return sum;
+        };
+        const autoRow = (sno, name, cats) => {
+            const ob = cats ? sumOb(cats) : 0;
+            const inst = cats ? sumInst(cats) : 0;
+            const disp = cats ? sumDisp(cats) : 0;
+            const trf = cats ? sumTrf(cats) : 0;
+            const pending = cats ? sumClosing(cats) : 0;
+            return `<tr class="bg-green-50" title="Auto from Data Entry"><td>${sno}</td><td class="text-left font-medium">${name}</td><td>${ob || '-'}</td><td>${inst || '-'}</td><td>${disp || '-'}</td><td>${trf || '-'}</td><td>${pending || '-'}</td></tr>`;
+        };
+        const manualRow = (sno, name, rowIdx) => {
+            const keys = [`s3_m_${rowIdx}_0`, `s3_m_${rowIdx}_1`, `s3_m_${rowIdx}_2`, `s3_m_${rowIdx}_3`, `s3_m_${rowIdx}_4` ];
+            return `<tr class="bg-yellow-50" title="Editable">
+                <td>${sno}</td>
+                <td class="text-left font-medium">${name}</td>
+                <td data-manual="${keys[0]}" contenteditable="true" class="manual-cell">${monthData.manual[keys[0]] || '-'}</td>
+                <td data-manual="${keys[1]}" contenteditable="true" class="manual-cell">${monthData.manual[keys[1]] || '-'}</td>
+                <td data-manual="${keys[2]}" contenteditable="true" class="manual-cell">${monthData.manual[keys[2]] || '-'}</td>
+                <td data-manual="${keys[3]}" contenteditable="true" class="manual-cell">${monthData.manual[keys[3]] || '-'}</td>
+                <td data-manual="${keys[4]}" contenteditable="true" class="manual-cell">${monthData.manual[keys[4]] || '-'}</td>
+            </tr>`;
+        };
+        return `<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-3">
+            <i class="fas fa-info-circle"></i> <strong>Green rows</strong> = Auto-calculated from Data Entry. <strong>Yellow rows</strong> = Manual/Editable fields.
+        </div>
+        <table class="statement-table w-full">
+            <thead><tr><th>S.No.</th><th class="text-left">Nature of Cases</th><th>Opening</th><th>Institution</th><th>Decided</th><th>Transferred</th><th>Pending</th></tr></thead>
+            <tbody>
+                ${manualRow('1', 'U/S 258 Cr.Pc.', 1)}
+                ${autoRow('2', 'Cases related to rape and sexual Harrasment', rapeCats)}
+                ${manualRow('3', 'Petty offence cases related to under trial prisoners', 3)}
+                ${autoRow('4', 'Cases related to women', rapeCats)}
+                ${manualRow('5', 'Cases relared to juvenile', 5)}
+                ${manualRow('6', 'Diffrently abled person', 6)}
+                ${manualRow('7', 'Senior citizens', 7)}
+                ${autoRow('8', 'Cases pending for commital', committalCats)}
+                ${manualRow('9', 'Cases related to intellectual property rights', 9)}
+                ${manualRow('10', 'Cases related to commercial arbitration', 10)}
+                ${manualRow('11', 'Accused in jail for more than 03 years', 11)}
+                ${manualRow('12', 'Civil cases in which injuction/ stay have been granted by subordinate court', 12)}
+                ${manualRow('13', 'No. of Cases in which accused in jail for 05-10 years', 13)}
+                ${manualRow('14', 'No. of Cases in which accused in jail  more than10 years', 14)}
+                ${manualRow('15', 'Old criminal cases involving petty offence prior to the year 2000', 15)}
+                ${autoRow('16', 'Traffic challan', mvCats)}
+                ${manualRow('17', 'Municipal challan', 17)}
+                ${autoRow('18', 'Complaint cases u/s 138 Negotiabel instrment', niCats)}
+                ${manualRow('19', 'Total no. of cases in which benefit of the probation of offenders Act,1958 has been granted to the accused', 19)}
+                ${manualRow('20', 'No. of cases of under trial prisoners langusing in jail for more than 06 months duration in magisterial Court', 20)}
+                ${manualRow('21', 'No. of cases of under trial prisoners langusing in jail for more than 02 years duration in magisterial Court', 21)}
+                ${manualRow('22', 'Cases in which procedings before the trial court have been stayed by Sessions Court/Fast Track of Sessions Judge', 22)}
+            </tbody>
+        </table>`;
+    }
+
+    genInformation() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const allCats = this.getCategories().map(c => c.id);
+        const ob = this.sumCategories(monthData, allCats, 'ob');
+        const instDir = this.sumCategories(monthData, allCats, 'inst_dir');
+        const instTrf = this.sumCategories(monthData, allCats, 'inst_trf') + this.sumCategories(monthData, allCats, 'trf_in');
+        const disp = this.sumCategories(monthData, allCats, 'disp_con') + this.sumCategories(monthData, allCats, 'disp_uncon') + this.sumCategories(monthData, allCats, 'disp_comm');
+        const dispTrf = this.sumCategories(monthData, allCats, 'disp_trf') + this.sumCategories(monthData, allCats, 'trf_out');
+        const closing = this.sumClosing(monthData, allCats);
+        return `<table class="statement-table w-full">
+            <thead><tr><th>Nature of Case</th><th>Opening balance at start of Month</th><th>Direct</th><th>Transfer</th><th>Direct</th><th>Transfer</th><th>Closing Balance at end of month</th></tr></thead>
+            <tbody>
+                <tr><td class="text-left font-bold">criminal case</td><td>${ob}</td><td>${instDir}</td><td>${instTrf}</td><td>${disp}</td><td>${dispTrf}</td><td class="font-bold">${closing}</td></tr>
+                <tr><td class="text-left font-bold text-slate-400">Civil Cases</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td></tr>
+            </tbody>
+        </table>`;
+    }
+
+    genMissionMode() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const getClosing = (catIds) => {
+            let sum = 0;
+            catIds.forEach(catId => {
+                const catData = monthData.data[catId] || {};
+                Object.values(catData).forEach(d => sum += this.calculateClosing(d));
+            });
+            return sum;
+        };
+        const rows = [
+            { name: 'Session Trial', cats: [] },
+            { name: 'Warrant Trial', cats: this.getCategories().filter(c => c.group === 'W/S State' || c.group === 'W/S Complaint').map(c => c.id) },
+            { name: 'Arms Act', cats: ['ws_state_arms'] },
+            { name: 'Family related Cases', cats: [] },
+            { name: 'Cases 138 N.I. Act', cats: ['summons_complaint_ni'] },
+            { name: 'Summon Trial', cats: this.getCategories().filter(c => c.group === 'Summons State' || c.group === 'Summons Complaint').map(c => c.id) },
+            { name: 'LDA', cats: [] },
+            { name: 'Traffic Challan', cats: ['mv_act'] },
+            { name: 'ARTO Challan', cats: [] },
+            { name: 'Cases under Municipal Corporation', cats: ['other_challan'] },
+            { name: 'Forest Act', cats: [] },
+            { name: 'Excise Act', cats: ['ws_state_excise'] },
+            { name: 'Labour Act', cats: [] },
+            { name: 'Case under Entertainment Act', cats: [] },
+            { name: 'Factory Act', cats: [] },
+            { name: 'Wild Life Act', cats: [] },
+            { name: 'Applications u/s 156(3)Cr.Pc.', cats: [] },
+            { name: 'Cases u/s 446 Cr.Pc.', cats: [] },
+            { name: 'Insecticide Act', cats: [] },
+            { name: 'I T  Act', cats: [] },
+            { name: 'Prevention of Cruelty to Animal Act', cats: [] },
+            { name: 'PNDT Act', cats: [] },
+            { name: 'Minning Act', cats: [] },
+            { name: 'Other Acts', cats: ['ws_state_other', 'summons_state_other', 'summons_complaint_other'] },
+            { name: 'Cases under the NDPS Act', cats: ['ws_state_ndps'] },
+            { name: 'Final Reports', cats: ['fr'] },
+            { name: 'Criminal Appeal', cats: [] },
+            { name: 'Criminal Revisions', cats: [] },
+            { name: 'Criminal Misc.', cats: ['crim_misc_173', 'crim_misc_other', 'bail'] },
+            { name: 'Anti Corruption ', cats: [] }
+        ];
+        let total = 0;
+        let html = '<table class="statement-table w-full"><thead><tr><th class="text-left">Sr. no</th><th class="text-left">Type of cases</th><th>Pendency</th></tr></thead><tbody>';
+        rows.forEach((row, idx) => {
+            const pen = getClosing(row.cats);
+            total += pen;
+            html += `<tr><td class="text-left">${idx+1}</td><td class="text-left">${row.name}</td><td>${pen || '-'}</td></tr>`;
+        });
+        html += `<tr class="bg-slate-100 font-bold"><td class="text-left">31</td><td class="text-left">Total no. of Cases</td><td>${total}</td></tr></tbody></table>`;
+        return html;
+    }
+
+    genMonthlyPettyACD() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const m = this.formatMonth(this.currentMonth);
+        return `<div class="space-y-6">
+            <h3 class="font-bold text-slate-800">PERFORMA 'A'</h3>
+            <p class="text-sm text-slate-600">PENDENCY OF PETTY/ NON PETTY OFFENCE CASES Month ${m}</p>
+            <table class="statement-table w-full">
+                <thead><tr><th>S. No.</th><th>Courts Name</th><th>Total No. of Criminal Cases Pending In all Magistrate courts of the Judgeship</th><th>Total No. of Criminal Petty offence cases(Challan) Pending Court</th><th>Total no of Criminal Non petty Offence cases pending courts</th><th>Remarks</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td class="text-left">A.C.J.M</td>${this.manualCell('petty_acd_1_1')}${this.manualCell('petty_acd_1_2')}${this.manualCell('petty_acd_1_3')}${this.manualCell('petty_acd_1_4')}</tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Additional Chief Judicial Magistrate Baghpat C (petty Offence Cases)</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th>S.No.</th><th>Name of the Court</th><th>Opening Balance</th><th>Institution</th><th>Institution By Transfer</th><th>Disposal</th><th>Disposal By Transfer</th><th>Total Amount of fine realized in petty offence cases</th><th>Closing Balance</th></tr></thead>
+                <tbody>
+                    <tr><td>2</td><td class="text-left">A.C.J.M</td>${this.manualCell('petty_acd_2_1')}${this.manualCell('petty_acd_2_2')}${this.manualCell('petty_acd_2_3')}${this.manualCell('petty_acd_2_4')}${this.manualCell('petty_acd_2_5')}${this.manualCell('petty_acd_2_6')}${this.manualCell('petty_acd_2_7')}</tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Statement regarding Number of Summans in Petty Offence Cases Sent for Service Notice (Proforma -D) Additional Chief Judicial Magistrate Baghpat</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th>S.No.</th><th>Name of the Court</th><th>Number Of Summons Sent to Police For Service</th><th>Number of Served Summons</th><th>Number Of Summons Returned - Unserved</th><th>Number of Summons Under Process/ not returned</th></tr></thead>
+                <tbody>
+                    <tr><td>3</td><td class="text-left">A.C.J.M</td>${this.manualCell('petty_acd_3_1')}${this.manualCell('petty_acd_3_2')}${this.manualCell('petty_acd_3_3')}${this.manualCell('petty_acd_3_4')}</tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Statement of Expediotious disposed of Cases pertaining to Petty offence under the "Saral Petty offince Fine deposit Scheme" relating to deposit of fine in (power jyoti Account)</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th></th><th>Nil</th></tr></thead>
+                <tbody><tr><td class="text-left"></td><td>Nil</td></tr></tbody>
+            </table>
+            <div class="text-sm text-slate-600 mt-2">Prepared by- _________________ &nbsp;&nbsp;&nbsp; Checked by- _________________ &nbsp;&nbsp;&nbsp; A.C.J.M BAGHPAT</div>
+        </div>`;
+    }
+
+    genMonthlyThird() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const cats = this.getCategories();
+        const allIds = cats.map(c => c.id);
+        const ob = this.sumCategories(monthData, allIds, 'ob');
+        const inst = this.sumCategories(monthData, allIds, 'inst_dir');
+        const instTrf = this.sumCategories(monthData, allIds, 'inst_trf') + this.sumCategories(monthData, allIds, 'trf_in');
+        const disp = this.sumCategories(monthData, allIds, 'disp_con') + this.sumCategories(monthData, allIds, 'disp_uncon') + this.sumCategories(monthData, allIds, 'disp_comm');
+        const dispTrf = this.sumCategories(monthData, allIds, 'disp_trf') + this.sumCategories(monthData, allIds, 'trf_out');
+        const closing = this.sumClosing(monthData, allIds);
+        return `<div class="space-y-6">
+            <h3 class="font-bold text-slate-800 text-center">Monthly Statement regarding Civil and Criminal Cases pending in the Court of ACJM for the month of ${this.formatMonth(this.currentMonth)}</h3>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>Civil and Criminal Cases</th><th>Suit</th><th>L.A.R. Cases</th><th>S.C.C. Suits</th><th>Election Petition</th><th>M.A.C. Cases</th><th>Civil Appeal</th><th>Misc. Appeal</th><th>Civil Revision</th><th>S.C.C.R.</th><th>Arbitration Cases</th><th>Tax Appeal</th><th>Other Misc. Cases</th><th>P.A. Cases</th><th>Execution</th><th>Session Trials</th><th>Sc/St Act/Spl. Cases</th><th>N.D.P.S. Act</th><th>Crl. Cases/Anti corruption/Magistrate trial /Gangster Act</th><th>Crl. Appeal</th><th>Crl. Revision</th><th>Crl. Misc. Cases</th><th>Total</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left font-bold">Criminal Cases</td>${this.manualCell('mt_1_1')}${this.manualCell('mt_1_2')}${this.manualCell('mt_1_3')}${this.manualCell('mt_1_4')}${this.manualCell('mt_1_5')}${this.manualCell('mt_1_6')}${this.manualCell('mt_1_7')}${this.manualCell('mt_1_8')}${this.manualCell('mt_1_9')}${this.manualCell('mt_1_10')}${this.manualCell('mt_1_11')}${this.manualCell('mt_1_12')}${this.manualCell('mt_1_13')}${this.manualCell('mt_1_14')}${this.manualCell('mt_1_15')}${this.manualCell('mt_1_16')}${this.manualCell('mt_1_17')}${this.manualCell('mt_1_18')}${this.manualCell('mt_1_19')}${this.manualCell('mt_1_20')}${this.manualCell('mt_1_21')}<td class="font-bold">${closing}</td></tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">MONTHLY STATEMENT SHOWING INSTITUTION, DISPOSAL & PENDENCY OF CRIMINAL CASES DURING THE MONTH OF ${this.formatMonth(this.currentMonth)}</h4>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th></th><th>Opening Balance</th><th colspan="2">Institution</th><th colspan="2">Disposal</th><th>Closing Balance</th><th>Pending Over 6 Months</th><th colspan="4">Particulars of three oldest cases</th></tr>
+                <tr><th></th><th></th><th>Actual</th><th>By transfer</th><th>Actual</th><th>By Transfer</th><th></th><th></th><th></th><th></th><th></th><th></th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">Sessions Trial</td>${this.manualCell('mt_c_1_1')}${this.manualCell('mt_c_1_2')}${this.manualCell('mt_c_1_3')}${this.manualCell('mt_c_1_4')}${this.manualCell('mt_c_1_5')}${this.manualCell('mt_c_1_6')}${this.manualCell('mt_c_1_7')}${this.manualCell('mt_c_1_8')}${this.manualCell('mt_c_1_9')}${this.manualCell('mt_c_1_10')}</tr>
+                    <tr><td class="text-left">Criminal Appeal</td>${this.manualCell('mt_c_2_1')}${this.manualCell('mt_c_2_2')}${this.manualCell('mt_c_2_3')}${this.manualCell('mt_c_2_4')}${this.manualCell('mt_c_2_5')}${this.manualCell('mt_c_2_6')}${this.manualCell('mt_c_2_7')}${this.manualCell('mt_c_2_8')}${this.manualCell('mt_c_2_9')}${this.manualCell('mt_c_2_10')}</tr>
+                    <tr><td class="text-left">Criminal Revision</td>${this.manualCell('mt_c_3_1')}${this.manualCell('mt_c_3_2')}${this.manualCell('mt_c_3_3')}${this.manualCell('mt_c_3_4')}${this.manualCell('mt_c_3_5')}${this.manualCell('mt_c_3_6')}${this.manualCell('mt_c_3_7')}${this.manualCell('mt_c_3_8')}${this.manualCell('mt_c_3_9')}${this.manualCell('mt_c_3_10')}</tr>
+                    <tr><td class="text-left">Anti Corruption Act</td>${this.manualCell('mt_c_4_1')}${this.manualCell('mt_c_4_2')}${this.manualCell('mt_c_4_3')}${this.manualCell('mt_c_4_4')}${this.manualCell('mt_c_4_5')}${this.manualCell('mt_c_4_6')}${this.manualCell('mt_c_4_7')}${this.manualCell('mt_c_4_8')}${this.manualCell('mt_c_4_9')}${this.manualCell('mt_c_4_10')}</tr>
+                    <tr><td class="text-left">Spl. Trial(NDPS)</td>${this.manualCell('mt_c_5_1')}${this.manualCell('mt_c_5_2')}${this.manualCell('mt_c_5_3')}${this.manualCell('mt_c_5_4')}${this.manualCell('mt_c_5_5')}${this.manualCell('mt_c_5_6')}${this.manualCell('mt_c_5_7')}${this.manualCell('mt_c_5_8')}${this.manualCell('mt_c_5_9')}${this.manualCell('mt_c_5_10')}</tr>
+                    <tr><td class="text-left">Spl. Crl. Cases(Sc/St Act)</td>${this.manualCell('mt_c_6_1')}${this.manualCell('mt_c_6_2')}${this.manualCell('mt_c_6_3')}${this.manualCell('mt_c_6_4')}${this.manualCell('mt_c_6_5')}${this.manualCell('mt_c_6_6')}${this.manualCell('mt_c_6_7')}${this.manualCell('mt_c_6_8')}${this.manualCell('mt_c_6_9')}${this.manualCell('mt_c_6_10')}</tr>
+                    <tr><td class="text-left">Crl. Misc. Case</td>${this.manualCell('mt_c_7_1')}${this.manualCell('mt_c_7_2')}${this.manualCell('mt_c_7_3')}${this.manualCell('mt_c_7_4')}${this.manualCell('mt_c_7_5')}${this.manualCell('mt_c_7_6')}${this.manualCell('mt_c_7_7')}${this.manualCell('mt_c_7_8')}${this.manualCell('mt_c_7_9')}${this.manualCell('mt_c_7_10')}</tr>
+                    <tr><td class="text-left">Special Trial (Gangster Act)</td>${this.manualCell('mt_c_8_1')}${this.manualCell('mt_c_8_2')}${this.manualCell('mt_c_8_3')}${this.manualCell('mt_c_8_4')}${this.manualCell('mt_c_8_5')}${this.manualCell('mt_c_8_6')}${this.manualCell('mt_c_8_7')}${this.manualCell('mt_c_8_8')}${this.manualCell('mt_c_8_9')}${this.manualCell('mt_c_8_10')}</tr>
+                    <tr class="bg-slate-100 font-bold"><td class="text-left">TOTAL</td>${this.manualCell('mt_c_t_1')}${this.manualCell('mt_c_t_2')}${this.manualCell('mt_c_t_3')}${this.manualCell('mt_c_t_4')}${this.manualCell('mt_c_t_5')}${this.manualCell('mt_c_t_6')}${this.manualCell('mt_c_t_7')}${this.manualCell('mt_c_t_8')}${this.manualCell('mt_c_t_9')}${this.manualCell('mt_c_t_10')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genMonthlyFirst() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const m = this.formatMonth(this.currentMonth);
+        const years = this.getYears();
+        const sumClosingYear = (catIds, yr) => {
+            let s=0;
+            catIds.forEach(cid=>{
+                const d=monthData.data[cid]&&monthData.data[cid][yr]?monthData.data[cid][yr]:{};
+                s+=this.calculateClosing(d);
+            });
+            return s;
+        };
+        const sumDispYear = (catIds, yr) => {
+            let s=0;
+            catIds.forEach(cid=>{
+                const d=monthData.data[cid]&&monthData.data[cid][yr]?monthData.data[cid][yr]:{};
+                s+=(d.disp_con||0)+(d.disp_uncon||0)+(d.disp_comm||0);
+            });
+            return s;
+        };
+        const wsCats = this.getCategories().filter(c=>c.group==='W/S State'||c.group==='W/S Complaint').map(c=>c.id);
+        const smCats = this.getCategories().filter(c=>c.group==='Summons State'||c.group==='Summons Complaint').map(c=>c.id);
+        const frCats = ['fr'];
+        const rangePend = (cats, start, end) => {
+            let s=0;
+            years.forEach(y=>{ if(parseInt(y)>=start&&parseInt(y)<=end) s+=sumClosingYear(cats,y); });
+            return s;
+        };
+        const rangeDisp = (cats, start, end) => {
+            let s=0;
+            years.forEach(y=>{ if(parseInt(y)>=start&&parseInt(y)<=end) s+=sumDispYear(cats,y); });
+            return s;
+        };
+        return `<div class="space-y-6">
+            <h3 class="font-bold text-slate-800 text-center">Monthly Statement in the Court of ACJM for the month of ${m}</h3>
+            <h4 class="font-bold text-sm">Proforma-1 : Month-wise Disposal of Warrant Trial Cases</h4>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>District</th><th colspan="2">Pendency upto 1990</th><th colspan="2">Disposal upto 1990</th><th colspan="2">Pendency from 1991 to 2000</th><th colspan="2">Disposal from 1991 to 2000</th><th colspan="2">Pendency from 2001 to 2010</th><th colspan="2">Disposal from 2001 to 2010</th><th colspan="2">Pendency from 2011 to 2020</th><th colspan="2">Disposal from 2011 to 2020</th></tr>
+                <tr><th></th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">ACJM</td><td>${rangePend(wsCats,1990,1990)}</td><td>-</td><td>${rangeDisp(wsCats,1990,1990)}</td><td>-</td><td>${rangePend(wsCats,1991,2000)}</td><td>-</td><td>${rangeDisp(wsCats,1991,2000)}</td><td>-</td><td>${rangePend(wsCats,2001,2010)}</td><td>-</td><td>${rangeDisp(wsCats,2001,2010)}</td><td>-</td><td>${rangePend(wsCats,2011,2020)}</td><td>-</td><td>${rangeDisp(wsCats,2011,2020)}</td><td>-</td></tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Proforma-2 : Month-wise Disposal of Summon Trial Cases</h4>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>District</th><th colspan="2">Pendency upto 1990</th><th colspan="2">Disposal upto 1990</th><th colspan="2">Pendency from 1991 to 2000</th><th colspan="2">Disposal from 1991 to 2000</th><th colspan="2">Pendency from 2001 to 2010</th><th colspan="2">Disposal from 2001 to 2010</th><th colspan="2">Pendency from 2011 to 2020</th><th colspan="2">Disposal from 2011 to 2020</th></tr>
+                <tr><th></th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th><th>Complaint case</th><th>Police Chalan</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">ACJM</td><td>${rangePend(smCats,1990,1990)}</td><td>-</td><td>${rangeDisp(smCats,1990,1990)}</td><td>-</td><td>${rangePend(smCats,1991,2000)}</td><td>-</td><td>${rangeDisp(smCats,1991,2000)}</td><td>-</td><td>${rangePend(smCats,2001,2010)}</td><td>-</td><td>${rangeDisp(smCats,2001,2010)}</td><td>-</td><td>${rangePend(smCats,2011,2020)}</td><td>-</td><td>${rangeDisp(smCats,2011,2020)}</td><td>-</td></tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Proforma-3 : Month Wise Pendency and Disposal of Undertrial Cases</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th colspan="3">Pendency of Undertrial Cases</th><th colspan="3">Disposal of Undertrial Cases</th></tr>
+                <tr><th>More than 3 Years</th><th>More than 5 Years</th><th>More than 10 years</th><th>More than 3 years</th><th>More than 5 Years</th><th>More than 10 Years</th></tr></thead>
+                <tbody>
+                    <tr>${this.manualCell('mf_p3_1')}${this.manualCell('mf_p3_2')}${this.manualCell('mf_p3_3')}${this.manualCell('mf_p3_4')}${this.manualCell('mf_p3_5')}${this.manualCell('mf_p3_6')}</tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Proforma-4 : Month Wise Disposal of Final Report</h4>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th colspan="2">pendency upto 1990</th><th colspan="2">Disposal upto 1990</th><th colspan="2">Pendency from 1991 to 2000</th><th colspan="2">Disposal from 1991 to 2000</th><th colspan="2">Pendency from 2001 to 2010</th><th colspan="2">Disposal from 2001 to 2010</th><th colspan="2">Pendency from 2011 to 2020</th><th colspan="2">Disposal from 2011 to 2020</th></tr>
+                <tr><th>Complaint</th><th>Police</th><th>Complaint</th><th>Police</th><th>Complaint</th><th>Police</th><th>Complaint</th><th>Police</th><th>Complaint</th><th>Police</th><th>Complaint</th><th>Police</th><th>Complaint</th><th>Police</th><th>Complaint</th><th>Police</th></tr></thead>
+                <tbody>
+                    <tr><td>${rangePend(frCats,1990,1990)}</td><td>-</td><td>${rangeDisp(frCats,1990,1990)}</td><td>-</td><td>${rangePend(frCats,1991,2000)}</td><td>-</td><td>${rangeDisp(frCats,1991,2000)}</td><td>-</td><td>${rangePend(frCats,2001,2010)}</td><td>-</td><td>${rangeDisp(frCats,2001,2010)}</td><td>-</td><td>${rangePend(frCats,2011,2020)}</td><td>-</td><td>${rangeDisp(frCats,2011,2020)}</td><td>-</td></tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genMonthlySecond() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const cats = this.getCategories();
+        const allIds = cats.map(c=>c.id);
+        const ob = this.sumCategories(monthData, allIds, 'ob');
+        const closing = this.sumClosing(monthData, allIds);
+        return `<div class="space-y-6">
+            <h3 class="font-bold text-slate-800 text-center">Monthly Statements in the Court of ACJM for the month of ${this.formatMonth(this.currentMonth)}</h3>
+            <h4 class="font-bold text-sm">Pendency of total Civil and Criminal cases with age-wise breakup</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th></th><th>0-5 year old cases</th><th>more than 05 and upto 10 year old cases</th><th>More than 10 and upto 15 year old cases</th><th>More than 15 and upto 20 year old cases</th><th>Over 20 year old cases</th><th>Total</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">Civil</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td></tr>
+                    <tr><td class="text-left">Criminal</td>${this.manualCell('ms_age_1')}${this.manualCell('ms_age_2')}${this.manualCell('ms_age_3')}${this.manualCell('ms_age_4')}${this.manualCell('ms_age_5')}<td class="font-bold">${closing}</td></tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Total Number of cases in which proceeding are stayed by any Court</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th></th><th colspan="2">Total number of cases stayed by Hon'ble Supreme Court</th><th colspan="2">Total Number of cases stayed by Hon'ble High Court</th><th colspan="2">Total number of cases stayed by the Subordinate court itself</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">Civil Cases</td><td>NA</td><td></td><td>NA</td><td></td><td>NA</td><td></td></tr>
+                    <tr><td class="text-left">Criminal Cases</td>${this.manualCell('ms_stay_1')}${this.manualCell('ms_stay_2')}${this.manualCell('ms_stay_3')}${this.manualCell('ms_stay_4')}${this.manualCell('ms_stay_5')}${this.manualCell('ms_stay_6')}</tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Court-wise statement/information regarding disposal of criminal cases</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th>Total no. of Criminal Cases disposed of</th><th>Total no. of cases resulted in acquital</th><th>Total no. of cases resulted in conviction</th><th>Percentage of conviction</th></tr></thead>
+                <tbody>
+                    <tr>${this.manualCell('ms_disp_1')}${this.manualCell('ms_disp_2')}${this.manualCell('ms_disp_3')}${this.manualCell('ms_disp_4')}</tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">POCSO Act Cases yearwise breakup (Only for Courts designated for POCSO Act cases)</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th>Cases which are pending up to 01 year</th><th>Cases which are pending for more than 01 year and upto 02 year</th><th>Cases which are pending for more than 02 year and upto 03 year</th><th>Cases which are pending for more than 03 year and upto 05 year</th><th>Cases which are pending for more than 05 year and upto 10 year</th><th>Cases which are pending for more than 10</th><th>Total</th></tr></thead>
+                <tbody>
+                    <tr>${this.manualCell('ms_pocso_1')}${this.manualCell('ms_pocso_2')}${this.manualCell('ms_pocso_3')}${this.manualCell('ms_pocso_4')}${this.manualCell('ms_pocso_5')}${this.manualCell('ms_pocso_6')}${this.manualCell('ms_pocso_7')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genQuota() {
+        return `<div class="space-y-6">
+            <h3 class="font-bold text-slate-800 text-center">Out-turn of Work-done of Shri Awadesh Kumar III Addl. Chief Judicial Magistrate Baghpat for the month of ${this.formatMonth(this.currentMonth)}</h3>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>Total Days</th><th></th><th>Days</th><th></th><th colspan="3">Criminal Work</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">Sunday</td><td></td><td>${this.manualCell('q_1')}</td><td></td><td>Cases Decided Mps/MLAs @40Unit/Case & 12 Unit/case Incentive for more than 10 year Old</td><td>${this.manualCell('q_w_1')}</td><td>${this.manualCell('q_u_1')}</td></tr>
+                    <tr><td class="text-left">Second Saturday</td><td></td><td>${this.manualCell('q_2')}</td><td></td><td>Cases Decided Mps/MLAs @40Unit/Case</td><td>${this.manualCell('q_w_2')}</td><td>${this.manualCell('q_u_2')}</td></tr>
+                    <tr><td class="text-left">Compensatory Leave</td><td></td><td>${this.manualCell('q_3')}</td><td></td><td>Warrant Cases Decided Contested @6Unit/case & 03Unit/case Incentive for more than 20 year old</td><td>${this.manualCell('q_w_3')}</td><td>${this.manualCell('q_u_3')}</td></tr>
+                    <tr><td class="text-left">Casual Leave</td><td></td><td>${this.manualCell('q_4')}</td><td></td><td>Warrant cases Decided Contested @ 06 Units/Cases & Incentive 02Unit/Case for moer than 10 Year</td><td>${this.manualCell('q_w_4')}</td><td>${this.manualCell('q_u_4')}</td></tr>
+                    <tr><td class="text-left">Summer and Winter Recess</td><td></td><td>${this.manualCell('q_5')}</td><td></td><td>Warrant cases Decided Contested @ 06 Units/Cases & Incentive 01Unit/Case for moer than 05 Year</td><td>${this.manualCell('q_w_5')}</td><td>${this.manualCell('q_u_5')}</td></tr>
+                    <tr><td class="text-left">Fourth Saturday</td><td></td><td>${this.manualCell('q_6')}</td><td></td><td>Warrant cases Decided Contested @ 06 Units/Cases</td><td>${this.manualCell('q_w_6')}</td><td>${this.manualCell('q_u_6')}</td></tr>
+                    <tr><td class="text-left">Holiday</td><td></td><td>${this.manualCell('q_7')}</td><td></td><td>Essential comd. Act(Contested) @ 06 units/Cases</td><td>${this.manualCell('q_w_7')}</td><td>${this.manualCell('q_u_7')}</td></tr>
+                    <tr><td class="text-left">Training and Journey Leave</td><td></td><td>${this.manualCell('q_8')}</td><td></td><td>Excise Act(Contested)@2 unit per case & Incentive 0.5 for more than 05 years</td><td>${this.manualCell('q_w_8')}</td><td>${this.manualCell('q_u_8')}</td></tr>
+                    <tr><td class="text-left">Total Exempted Days</td><td>${this.manualCell('q_et')}</td><td>Days</td><td></td><td>Excise Act(Contested)@2 unit per case</td><td>${this.manualCell('q_w_9')}</td><td>${this.manualCell('q_u_9')}</td></tr>
+                    <tr><td class="text-left">Actual Working Days</td><td>${this.manualCell('q_aw')}</td><td>Days</td><td></td><td>Cases 173(4)Crpc decided@ 1 Unit per Case</td><td>${this.manualCell('q_w_10')}</td><td>${this.manualCell('q_u_10')}</td></tr>
+                    <tr><td class="text-left">Total Exempted Unit @3.28 Units Per day</td><td>${this.manualCell('q_eu')}</td><td>0</td><td>Units</td><td>Cases Decided U/s 203Crpc @ 01 Unit per Case</td><td>${this.manualCell('q_w_11')}</td><td>${this.manualCell('q_u_11')}</td></tr>
+                    <tr><td class="text-left">Total Unit To Be Achieved</td><td></td><td></td><td>${this.manualCell('q_ta')}</td><td>Bail Application decided @ 01 Unit per 10 Bail Application</td><td>${this.manualCell('q_w_12')}</td><td>${this.manualCell('q_u_12')}</td></tr>
+                    <tr><td class="text-left">Total Unit Achieved</td><td></td><td></td><td>${this.manualCell('q_ach')}</td><td>Cases Decided U/s299 Crpc @01Unit/ Cases</td><td>${this.manualCell('q_w_13')}</td><td>${this.manualCell('q_u_13')}</td></tr>
+                    <tr><td class="text-left" colspan="4" rowspan="5">Administrative/Miscellaneous Work<br>Bail & Remand @10 Unit/Month<br>Criminal Misc Work @ 02Unit/Month<br>Inspection of Jail @ 04 Units/Inspection<br>Misc Work @10Unit/month<br>Quarterly Inspection Office@10Unit/Inspection<br>Nodal Officer Computers<br>Custodial Death Enquiries</td><td>Charge Framed Cases @ 0.5 Unit per Charge</td><td>${this.manualCell('q_w_14')}</td><td>${this.manualCell('q_u_14')}</td></tr>
+                    <tr><td>Statement u/s 313 Cr.P.C cases @ 0.5 unit per case</td><td>${this.manualCell('q_w_15')}</td><td>${this.manualCell('q_u_15')}</td></tr>
+                    <tr><td>Cases Decided u/s-320 Cr.p.c Decided @02 Unit/Case</td><td>${this.manualCell('q_w_16')}</td><td>${this.manualCell('q_u_16')}</td></tr>
+                    <tr><td>Final Report Decided @ 01Unit/ 03Case</td><td>${this.manualCell('q_w_17')}</td><td>${this.manualCell('q_u_17')}</td></tr>
+                    <tr><td>cases Decided on Confess @0.5Unit/case</td><td>${this.manualCell('q_w_18')}</td><td>${this.manualCell('q_u_18')}</td></tr>
+                    <tr><td class="text-left" colspan="4">Day work as link Officer @03Units/Day</td><td>Cases Decided U/s245(2)Crpc@ 01unit/05Case</td><td>${this.manualCell('q_w_19')}</td><td>${this.manualCell('q_u_19')}</td></tr>
+                    <tr><td class="text-left" colspan="4">Days Data Forwarding @0.25Unit/Day</td><td>Pages Evidence Recorded @ 1Unit/10Pages</td><td>${this.manualCell('q_w_20')}</td><td>${this.manualCell('q_u_20')}</td></tr>
+                    <tr><td class="text-left" colspan="4">Total Administrative Unit</td><td>Evidence of 200& 202 Crpc Recorded @ 0.5unit/statement</td><td>${this.manualCell('q_w_21')}</td><td>${this.manualCell('q_u_21')}</td></tr>
+                    <tr><td class="text-left" colspan="4" rowspan="2"></td><td>Cases Commital @ 02 Unit/10 Cases</td><td>${this.manualCell('q_w_22')}</td><td>${this.manualCell('q_u_22')}</td></tr>
+                    <tr><td>Application decided u/s 311 crpc @1 unit per application</td><td>${this.manualCell('q_w_23')}</td><td>${this.manualCell('q_u_23')}</td></tr>
+                    <tr><td class="text-left" colspan="4"></td><td>Case in which accused is acquitted u/s256 crpc @2 unit per case</td><td>${this.manualCell('q_w_24')}</td><td>${this.manualCell('q_u_24')}</td></tr>
+                    <tr><td class="text-left" colspan="4"></td><td>Petty Case(MV ACT) @ 6 unit per 100 challan</td><td>${this.manualCell('q_w_25')}</td><td>${this.manualCell('q_u_25')}</td></tr>
+                    <tr class="bg-slate-100 font-bold"><td class="text-left" colspan="4"></td><td>Total</td><td></td><td>${this.manualCell('q_total')}</td></tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genQuarterSH() {
+        return `<div class="space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">Quarterly Statement of cases related to sexual harasshment and Rape Cases of woman in the Court of ACJM Baghpat for the Quarter Ending on ${this.formatMonth(this.currentMonth)}</h3>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>S.No.</th><th></th><th>Opening Balance</th><th>Institution</th><th>Disposal</th><th>Pendency</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th><th>21</th><th>22</th><th>23</th><th>24</th><th>25</th><th>26</th><th>Total</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td class="text-left">Total no. of accused person</td>${this.manualCell('qsh_1_1')}${this.manualCell('qsh_1_2')}${this.manualCell('qsh_1_3')}${this.manualCell('qsh_1_4')}${this.manualCell('qsh_1_5')}${this.manualCell('qsh_1_6')}${this.manualCell('qsh_1_7')}${this.manualCell('qsh_1_8')}${this.manualCell('qsh_1_9')}${this.manualCell('qsh_1_10')}${this.manualCell('qsh_1_11')}${this.manualCell('qsh_1_12')}${this.manualCell('qsh_1_13')}${this.manualCell('qsh_1_14')}${this.manualCell('qsh_1_15')}${this.manualCell('qsh_1_16')}${this.manualCell('qsh_1_17')}${this.manualCell('qsh_1_18')}${this.manualCell('qsh_1_19')}${this.manualCell('qsh_1_20')}${this.manualCell('qsh_1_21')}${this.manualCell('qsh_1_22')}${this.manualCell('qsh_1_23')}${this.manualCell('qsh_1_24')}</tr>
+                    <tr><td>2</td><td class="text-left">Total no. of cases triable by Magistrate</td>${this.manualCell('qsh_2_1')}${this.manualCell('qsh_2_2')}${this.manualCell('qsh_2_3')}${this.manualCell('qsh_2_4')}${this.manualCell('qsh_2_5')}${this.manualCell('qsh_2_6')}${this.manualCell('qsh_2_7')}${this.manualCell('qsh_2_8')}${this.manualCell('qsh_2_9')}${this.manualCell('qsh_2_10')}${this.manualCell('qsh_2_11')}${this.manualCell('qsh_2_12')}${this.manualCell('qsh_2_13')}${this.manualCell('qsh_2_14')}${this.manualCell('qsh_2_15')}${this.manualCell('qsh_2_16')}${this.manualCell('qsh_2_17')}${this.manualCell('qsh_2_18')}${this.manualCell('qsh_2_19')}${this.manualCell('qsh_2_20')}${this.manualCell('qsh_2_21')}${this.manualCell('qsh_2_22')}${this.manualCell('qsh_2_23')}${this.manualCell('qsh_2_24')}</tr>
+                    <tr><td>3</td><td class="text-left">Total no. of case triable by Session</td>${this.manualCell('qsh_3_1')}${this.manualCell('qsh_3_2')}${this.manualCell('qsh_3_3')}${this.manualCell('qsh_3_4')}${this.manualCell('qsh_3_5')}${this.manualCell('qsh_3_6')}${this.manualCell('qsh_3_7')}${this.manualCell('qsh_3_8')}${this.manualCell('qsh_3_9')}${this.manualCell('qsh_3_10')}${this.manualCell('qsh_3_11')}${this.manualCell('qsh_3_12')}${this.manualCell('qsh_3_13')}${this.manualCell('qsh_3_14')}${this.manualCell('qsh_3_15')}${this.manualCell('qsh_3_16')}${this.manualCell('qsh_3_17')}${this.manualCell('qsh_3_18')}${this.manualCell('qsh_3_19')}${this.manualCell('qsh_3_20')}${this.manualCell('qsh_3_21')}${this.manualCell('qsh_3_22')}${this.manualCell('qsh_3_23')}${this.manualCell('qsh_3_24')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genQuarterlyInstDispo() {
+        return `<div class="space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">Cases Instituted and Disposed in the Court of ACJM Baghpat during the quarter ending on ${this.formatMonth(this.currentMonth)}</h3>
+            <table class="statement-table w-full">
+                <thead><tr><th>Name of the State</th><th>Quarter</th><th colspan="3">Cases brought forward from the previous Quarter</th><th colspan="3">Freshly instituted Cases</th><th colspan="3">Disposed of cases</th><th colspan="3">Pending cases at the end of quarter</th></tr>
+                <tr><th></th><th></th><th>Civil</th><th>Criminal</th><th>Total</th><th>Civil</th><th>Criminal</th><th>Total</th><th>Civil</th><th>Criminal</th><th>Total</th><th>Civil</th><th>Criminal</th><th>Total</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">Uttar Pradesh</td><td>${this.manualCell('qid_q')}</td>${this.manualCell('qid_1_1')}${this.manualCell('qid_1_2')}${this.manualCell('qid_1_3')}${this.manualCell('qid_2_1')}${this.manualCell('qid_2_2')}${this.manualCell('qid_2_3')}${this.manualCell('qid_3_1')}${this.manualCell('qid_3_2')}${this.manualCell('qid_3_3')}${this.manualCell('qid_4_1')}${this.manualCell('qid_4_2')}${this.manualCell('qid_4_3')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genCrpc299() {
+        return `<div class="space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">Statement showing Accused person are absconding in the court of ACJM Baghpat as on ${this.formatMonth(this.currentMonth)}</h3>
+            <table class="statement-table w-full">
+                <thead><tr><th>No. of cases pending in which accused person are absconding</th><th>Total no. of cases in which proceeding have been taken U/S 299Cr.PC.</th><th>Remarks</th></tr></thead>
+                <tbody>
+                    <tr>${this.manualCell('299_1')}${this.manualCell('299_2')}${this.manualCell('299_3')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genSevenYearOld() {
+        return `<div class="space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">Statement showing seven years old cases pending in the Court of ACJM Baghpat as ${this.formatMonth(this.currentMonth)}</h3>
+            <table class="statement-table w-full">
+                <thead><tr><th>Type of cases</th><th>Opening balance of cases pending more than 07 seven years old</th><th>Institution</th><th>Disposal</th><th>Closing balance of cases pending more than 07 seven years old</th><th>Remarks</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">Criminal Cases</td>${this.manualCell('7yr_1')}${this.manualCell('7yr_2')}${this.manualCell('7yr_3')}${this.manualCell('7yr_4')}${this.manualCell('7yr_5')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genNewQuarterly() {
+        return `<div class="space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">DISTRICT COURT, BAGHPAT</h3>
+            <p class="text-sm text-center text-slate-600">NAME OF THE STATE- UTTAR PRADESH UNDER THE JURISDICTION OF HIGH COURT OF JUDICATURE AT ALLAHABAD</p>
+            <p class="text-sm text-center text-slate-600 font-bold">QUARTERLY STATISTICAL INFORMATION AS ON ${this.formatMonth(this.currentMonth)}</p>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>S. No.</th><th>MATTERS</th><th>0-5 YEARS</th><th>5-10 YEARS</th><th>10-20 YEARS</th><th>20-30 YEARS</th><th>MORE THAN 30 YEARS</th><th>TOTAL PENDENCY</th><th>MATTERS NOT READY</th><th>MATTERS STAYED BY HIGHER COURTS</th><th>WHETHER ONLY MAIN CASES HAVE BEEN COUNTED? (Y/N)</th><th>REMARKS IF ANY,</th></tr></thead>
+                <tbody>
+                    <tr><td colspan="12" class="text-left font-bold bg-slate-100">A CIVIL</td></tr>
+                    <tr><td></td><td class="text-left">TOTAL</td>${this.manualCell('nq_a_1')}${this.manualCell('nq_a_2')}${this.manualCell('nq_a_3')}${this.manualCell('nq_a_4')}${this.manualCell('nq_a_5')}${this.manualCell('nq_a_6')}${this.manualCell('nq_a_7')}${this.manualCell('nq_a_8')}${this.manualCell('nq_a_9')}${this.manualCell('nq_a_10')}</tr>
+                    <tr><td colspan="12" class="text-left font-bold bg-slate-100">B CRIMINAL</td></tr>
+                    <tr><td>1</td><td class="text-left">Trials in Magistrate Courts (except Negotaible Instrument cases)</td>${this.manualCell('nq_1_1')}${this.manualCell('nq_1_2')}${this.manualCell('nq_1_3')}${this.manualCell('nq_1_4')}${this.manualCell('nq_1_5')}${this.manualCell('nq_1_6')}${this.manualCell('nq_1_7')}${this.manualCell('nq_1_8')}${this.manualCell('nq_1_9')}${this.manualCell('nq_1_10')}</tr>
+                    <tr><td>2</td><td class="text-left">Negotaible Instrument Cases</td>${this.manualCell('nq_2_1')}${this.manualCell('nq_2_2')}${this.manualCell('nq_2_3')}${this.manualCell('nq_2_4')}${this.manualCell('nq_2_5')}${this.manualCell('nq_2_6')}${this.manualCell('nq_2_7')}${this.manualCell('nq_2_8')}${this.manualCell('nq_2_9')}${this.manualCell('nq_2_10')}</tr>
+                    <tr><td>3</td><td class="text-left">Juvenile justice Matters</td>${this.manualCell('nq_3_1')}${this.manualCell('nq_3_2')}${this.manualCell('nq_3_3')}${this.manualCell('nq_3_4')}${this.manualCell('nq_3_5')}${this.manualCell('nq_3_6')}${this.manualCell('nq_3_7')}${this.manualCell('nq_3_8')}${this.manualCell('nq_3_9')}${this.manualCell('nq_3_10')}</tr>
+                    <tr><td>4</td><td class="text-left">Session Trials (Except POCSO/NDPS/SC ST Act Matters)</td>${this.manualCell('nq_4_1')}${this.manualCell('nq_4_2')}${this.manualCell('nq_4_3')}${this.manualCell('nq_4_4')}${this.manualCell('nq_4_5')}${this.manualCell('nq_4_6')}${this.manualCell('nq_4_7')}${this.manualCell('nq_4_8')}${this.manualCell('nq_4_9')}${this.manualCell('nq_4_10')}</tr>
+                    <tr><td>5</td><td class="text-left">POCSO Matters</td>${this.manualCell('nq_5_1')}${this.manualCell('nq_5_2')}${this.manualCell('nq_5_3')}${this.manualCell('nq_5_4')}${this.manualCell('nq_5_5')}${this.manualCell('nq_5_6')}${this.manualCell('nq_5_7')}${this.manualCell('nq_5_8')}${this.manualCell('nq_5_9')}${this.manualCell('nq_5_10')}</tr>
+                    <tr><td>6</td><td class="text-left">NDPS Matters</td>${this.manualCell('nq_6_1')}${this.manualCell('nq_6_2')}${this.manualCell('nq_6_3')}${this.manualCell('nq_6_4')}${this.manualCell('nq_6_5')}${this.manualCell('nq_6_6')}${this.manualCell('nq_6_7')}${this.manualCell('nq_6_8')}${this.manualCell('nq_6_9')}${this.manualCell('nq_6_10')}</tr>
+                    <tr><td>7</td><td class="text-left">SC/ST Matters</td>${this.manualCell('nq_7_1')}${this.manualCell('nq_7_2')}${this.manualCell('nq_7_3')}${this.manualCell('nq_7_4')}${this.manualCell('nq_7_5')}${this.manualCell('nq_7_6')}${this.manualCell('nq_7_7')}${this.manualCell('nq_7_8')}${this.manualCell('nq_7_9')}${this.manualCell('nq_7_10')}</tr>
+                    <tr><td>8</td><td class="text-left">Criminal Appeal</td>${this.manualCell('nq_8_1')}${this.manualCell('nq_8_2')}${this.manualCell('nq_8_3')}${this.manualCell('nq_8_4')}${this.manualCell('nq_8_5')}${this.manualCell('nq_8_6')}${this.manualCell('nq_8_7')}${this.manualCell('nq_8_8')}${this.manualCell('nq_8_9')}${this.manualCell('nq_8_10')}</tr>
+                    <tr><td>9</td><td class="text-left">Criminal Revisions</td>${this.manualCell('nq_9_1')}${this.manualCell('nq_9_2')}${this.manualCell('nq_9_3')}${this.manualCell('nq_9_4')}${this.manualCell('nq_9_5')}${this.manualCell('nq_9_6')}${this.manualCell('nq_9_7')}${this.manualCell('nq_9_8')}${this.manualCell('nq_9_9')}${this.manualCell('nq_9_10')}</tr>
+                    <tr><td>10</td><td class="text-left">Bail Applications</td>${this.manualCell('nq_10_1')}${this.manualCell('nq_10_2')}${this.manualCell('nq_10_3')}${this.manualCell('nq_10_4')}${this.manualCell('nq_10_5')}${this.manualCell('nq_10_6')}${this.manualCell('nq_10_7')}${this.manualCell('nq_10_8')}${this.manualCell('nq_10_9')}${this.manualCell('nq_10_10')}</tr>
+                    <tr><td>11(A)</td><td class="text-left">other Criminal Cases (Total) - Criminal Misc</td>${this.manualCell('nq_11a_1')}${this.manualCell('nq_11a_2')}${this.manualCell('nq_11a_3')}${this.manualCell('nq_11a_4')}${this.manualCell('nq_11a_5')}${this.manualCell('nq_11a_6')}${this.manualCell('nq_11a_7')}${this.manualCell('nq_11a_8')}${this.manualCell('nq_11a_9')}${this.manualCell('nq_11a_10')}</tr>
+                    <tr><td>11(B)</td><td class="text-left">Final Reports</td>${this.manualCell('nq_11b_1')}${this.manualCell('nq_11b_2')}${this.manualCell('nq_11b_3')}${this.manualCell('nq_11b_4')}${this.manualCell('nq_11b_5')}${this.manualCell('nq_11b_6')}${this.manualCell('nq_11b_7')}${this.manualCell('nq_11b_8')}${this.manualCell('nq_11b_9')}${this.manualCell('nq_11b_10')}</tr>
+                    <tr><td>11(C)</td><td class="text-left">Motor Vehicle Act</td>${this.manualCell('nq_11c_1')}${this.manualCell('nq_11c_2')}${this.manualCell('nq_11c_3')}${this.manualCell('nq_11c_4')}${this.manualCell('nq_11c_5')}${this.manualCell('nq_11c_6')}${this.manualCell('nq_11c_7')}${this.manualCell('nq_11c_8')}${this.manualCell('nq_11c_9')}${this.manualCell('nq_11c_10')}</tr>
+                    <tr><td>11(D)</td><td class="text-left">Gangster Act</td>${this.manualCell('nq_11d_1')}${this.manualCell('nq_11d_2')}${this.manualCell('nq_11d_3')}${this.manualCell('nq_11d_4')}${this.manualCell('nq_11d_5')}${this.manualCell('nq_11d_6')}${this.manualCell('nq_11d_7')}${this.manualCell('nq_11d_8')}${this.manualCell('nq_11d_9')}${this.manualCell('nq_11d_10')}</tr>
+                    <tr><td>11(E)</td><td class="text-left">Electricity Act</td>${this.manualCell('nq_11e_1')}${this.manualCell('nq_11e_2')}${this.manualCell('nq_11e_3')}${this.manualCell('nq_11e_4')}${this.manualCell('nq_11e_5')}${this.manualCell('nq_11e_6')}${this.manualCell('nq_11e_7')}${this.manualCell('nq_11e_8')}${this.manualCell('nq_11e_9')}${this.manualCell('nq_11e_10')}</tr>
+                    <tr><td>11(F)</td><td class="text-left">Family Court Matters(Criminal)</td>${this.manualCell('nq_11f_1')}${this.manualCell('nq_11f_2')}${this.manualCell('nq_11f_3')}${this.manualCell('nq_11f_4')}${this.manualCell('nq_11f_5')}${this.manualCell('nq_11f_6')}${this.manualCell('nq_11f_7')}${this.manualCell('nq_11f_8')}${this.manualCell('nq_11f_9')}${this.manualCell('nq_11f_10')}</tr>
+                    <tr class="bg-slate-100 font-bold"><td></td><td class="text-left">Total</td>${this.manualCell('nq_t_1')}${this.manualCell('nq_t_2')}${this.manualCell('nq_t_3')}${this.manualCell('nq_t_4')}${this.manualCell('nq_t_5')}${this.manualCell('nq_t_6')}${this.manualCell('nq_t_7')}${this.manualCell('nq_t_8')}${this.manualCell('nq_t_9')}${this.manualCell('nq_t_10')}</tr>
+                    <tr class="bg-slate-100 font-bold"><td></td><td class="text-left">Total (Civil+ Criminal)</td>${this.manualCell('nq_tc_1')}${this.manualCell('nq_tc_2')}${this.manualCell('nq_tc_3')}${this.manualCell('nq_tc_4')}${this.manualCell('nq_tc_5')}${this.manualCell('nq_tc_6')}${this.manualCell('nq_tc_7')}${this.manualCell('nq_tc_8')}${this.manualCell('nq_tc_9')}${this.manualCell('nq_tc_10')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genNIQuarterly() {
+        return `<div class="space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">Disposal of old cases IN THE MONTH OF ${this.formatMonth(this.currentMonth)} in ACJM COURT BAGHPAT</h3>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>Name of Court</th><th colspan="2">Family Court</th><th colspan="2">Commercial Court</th><th colspan="2">JJB</th><th colspan="2">POCSO</th><th colspan="2">PCA</th><th colspan="2">Exclusive NI Courts</th><th colspan="2">LAC</th><th colspan="2">MACT</th><th colspan="2">No of Execution Petitions</th></tr>
+                <tr><th></th><th>Pending March</th><th>Disposed April</th><th>Pending March</th><th>Disposed April</th><th>Pending March</th><th>Disposed April</th><th>Pending March</th><th>Disposed April</th><th>Pending March</th><th>Disposed April</th><th>Pending March</th><th>Disposed April</th><th>Pending March</th><th>Disposed April</th><th>Pending March</th><th>Disposed April</th><th>Pending March</th><th>Disposed April</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">ACJM</td>${this.manualCell('niq_1_1')}${this.manualCell('niq_1_2')}${this.manualCell('niq_1_3')}${this.manualCell('niq_1_4')}${this.manualCell('niq_1_5')}${this.manualCell('niq_1_6')}${this.manualCell('niq_1_7')}${this.manualCell('niq_1_8')}${this.manualCell('niq_1_9')}${this.manualCell('niq_1_10')}${this.manualCell('niq_1_11')}${this.manualCell('niq_1_12')}${this.manualCell('niq_1_13')}${this.manualCell('niq_1_14')}${this.manualCell('niq_1_15')}${this.manualCell('niq_1_16')}${this.manualCell('niq_1_17')}${this.manualCell('niq_1_18')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genHalfYearly1() {
+        return `<div class="space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">Statement No. 03</h3>
+            <p class="text-sm text-center text-slate-600">Statement showing the institution, Disposal and Pendency of Criminal Cases in magisterial Court in the state / Territory of Uttar Pradesh for the Half Year ending on ${this.formatMonth(this.currentMonth)}</p>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>Class of Cases</th><th>Cases pending at the beginning of the half year</th><th>Cases instituted during the half year</th><th>Csaes diposed during the half year</th><th>Less than 06 months</th><th>06-12 months</th><th>01-03 years</th><th>03-10 years</th><th>Over 10 years</th><th>Total of columns 05-09</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">Police Challan Cases</td>${this.manualCell('hy1_1_1')}${this.manualCell('hy1_1_2')}${this.manualCell('hy1_1_3')}${this.manualCell('hy1_1_4')}${this.manualCell('hy1_1_5')}${this.manualCell('hy1_1_6')}${this.manualCell('hy1_1_7')}${this.manualCell('hy1_1_8')}${this.manualCell('hy1_1_9')}</tr>
+                    <tr><td class="text-left">Complaint Cases</td>${this.manualCell('hy1_2_1')}${this.manualCell('hy1_2_2')}${this.manualCell('hy1_2_3')}${this.manualCell('hy1_2_4')}${this.manualCell('hy1_2_5')}${this.manualCell('hy1_2_6')}${this.manualCell('hy1_2_7')}${this.manualCell('hy1_2_8')}${this.manualCell('hy1_2_9')}</tr>
+                    <tr><td class="text-left">Traffic Cases</td>${this.manualCell('hy1_3_1')}${this.manualCell('hy1_3_2')}${this.manualCell('hy1_3_3')}${this.manualCell('hy1_3_4')}${this.manualCell('hy1_3_5')}${this.manualCell('hy1_3_6')}${this.manualCell('hy1_3_7')}${this.manualCell('hy1_3_8')}${this.manualCell('hy1_3_9')}</tr>
+                    <tr><td class="text-left">3/7 EC ACT and Food adultration Cases</td>${this.manualCell('hy1_4_1')}${this.manualCell('hy1_4_2')}${this.manualCell('hy1_4_3')}${this.manualCell('hy1_4_4')}${this.manualCell('hy1_4_5')}${this.manualCell('hy1_4_6')}${this.manualCell('hy1_4_7')}${this.manualCell('hy1_4_8')}${this.manualCell('hy1_4_9')}</tr>
+                    <tr><td class="text-left">Other Cases</td>${this.manualCell('hy1_5_1')}${this.manualCell('hy1_5_2')}${this.manualCell('hy1_5_3')}${this.manualCell('hy1_5_4')}${this.manualCell('hy1_5_5')}${this.manualCell('hy1_5_6')}${this.manualCell('hy1_5_7')}${this.manualCell('hy1_5_8')}${this.manualCell('hy1_5_9')}</tr>
+                    <tr class="bg-slate-100 font-bold"><td class="text-left">Total</td>${this.manualCell('hy1_t_1')}${this.manualCell('hy1_t_2')}${this.manualCell('hy1_t_3')}${this.manualCell('hy1_t_4')}${this.manualCell('hy1_t_5')}${this.manualCell('hy1_t_6')}${this.manualCell('hy1_t_7')}${this.manualCell('hy1_t_8')}${this.manualCell('hy1_t_9')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genHalfYearly2() {
+        return `<div class="space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">Statement No. 07</h3>
+            <p class="text-sm text-center text-slate-600">Statement showing the institution, Disposal and Pendency of Criminal Cases in magisterial Court in the state / Territory of Uttar Pradesh for the Half Year ending on ${this.formatMonth(this.currentMonth)}</p>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>Nature of Cases</th><th>Cases pending at the beginning of the half year</th><th>Cases instituted during the half year</th><th>Csaes diposed during the half year</th><th>Less than 06 months</th><th>06-12 months</th><th>01-03 years</th><th>03-10 years</th><th>Over 10 years</th><th>Total of columns 05-09</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">Civil Cases</td><td>-</td><td>-</td><td>-</td><td>-</td><td>--</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                    <tr><td class="text-left">Criminal Cases</td>${this.manualCell('hy2_1_1')}${this.manualCell('hy2_1_2')}${this.manualCell('hy2_1_3')}${this.manualCell('hy2_1_4')}${this.manualCell('hy2_1_5')}${this.manualCell('hy2_1_6')}${this.manualCell('hy2_1_7')}${this.manualCell('hy2_1_8')}${this.manualCell('hy2_1_9')}</tr>
+                    <tr class="bg-slate-100 font-bold"><td class="text-left">Total</td>${this.manualCell('hy2_t_1')}${this.manualCell('hy2_t_2')}${this.manualCell('hy2_t_3')}${this.manualCell('hy2_t_4')}${this.manualCell('hy2_t_5')}${this.manualCell('hy2_t_6')}${this.manualCell('hy2_t_7')}${this.manualCell('hy2_t_8')}${this.manualCell('hy2_t_9')}</tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    genYearly() {
+        return `<div class="space-y-6">
+            <h3 class="font-bold text-slate-800 text-center">Annexure IV</h3>
+            <p class="text-sm text-center text-slate-600 font-bold">Cases Instituted and Disposed in the Year ${this.currentMonth.split('-')[0]} (SUBORDINATE COURTS of HIGH COURT, ALLAHABAD)</p>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th></th><th colspan="3">Cases brought forward from the previous year (Nos.) (Civil/Crl.)</th><th colspan="3">Freshly instituted (Nos.) (Civil/Crl.)</th><th colspan="3">Disposed off Cases (Nos.) (Civil/Crl.)</th><th colspan="3">Pending Cases at the end of the Quarter (Nos.)</th></tr>
+                <tr><th></th><th>Civil</th><th>Criminal</th><th>Civil + Crl.</th><th>Civil</th><th>Criminal</th><th>Civil + Crl.</th><th>Civil</th><th>Criminal</th><th>Civil + Crl.</th><th>Civil</th><th>Criminal</th><th>Civil + Crl.</th></tr></thead>
+                <tbody>
+                    <tr><td class="text-left">ACJM</td><td>0</td><td></td><td></td><td>0</td><td>${this.manualCell('yr_1_1')}</td><td>${this.manualCell('yr_1_2')}</td><td>0</td><td>${this.manualCell('yr_1_3')}</td><td>${this.manualCell('yr_1_4')}</td><td>0</td><td>${this.manualCell('yr_1_5')}</td><td>${this.manualCell('yr_1_6')}</td></tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Status of Cases in terms of Pendency as on 31.12.${this.currentMonth.split('-')[0]} (SUBORDINATE COURTS of HIGH COURT, ALLAHABAD)</h4>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th>Year</th><th colspan="4">CIVIL CASES PENDING FOR</th><th colspan="4">CRIMINAL CASES PENDING FOR</th></tr>
+                <tr><th></th><th>Upto 1 yr.</th><th>More than 2 yrs.</th><th>More than 5 yrs.</th><th>More than 1 yr. and Less than 2 yrs.</th><th>More than 2 yrs.</th><th>More than 5 yrs.</th><th>Upto 1 yr.</th><th>More than 1 yr. and Less than 2 yrs.</th><th>More than 2 yrs.</th><th>More than 5 yrs.</th></tr></thead>
+                <tbody>
+                    <tr><td>${this.currentMonth.split('-')[0]}</td><td>0</td><td></td><td>-</td><td>-</td><td>0</td><td>0</td><td>0</td><td>${this.manualCell('yr_s_1')}</td><td>${this.manualCell('yr_s_2')}</td><td>${this.manualCell('yr_s_3')}</td><td>${this.manualCell('yr_s_4')}</td></tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Strength of Judges As on 31.12.${this.currentMonth.split('-')[0]}</h4>
+            <table class="statement-table w-full">
+                <thead><tr><th>Sanctioned Strength</th><th>Working Strength</th><th>Vacancy</th></tr></thead>
+                <tbody>
+                    <tr><td>${this.manualCell('yr_j_1')}</td><td>${this.manualCell('yr_j_2')}</td><td>${this.manualCell('yr_j_3')}</td></tr>
+                </tbody>
+            </table>
+            <h4 class="font-bold text-sm mt-4">Bifurcation of Pending Cases (As on 31.12.${this.currentMonth.split('-')[0]}) (SUBORDINATE COURTS of HIGH COURT, ALLAHABAD)</h4>
+            <table class="statement-table w-full text-xs">
+                <thead><tr><th colspan="2">CIVIL CASES</th><th colspan="2">(CIV + CRL)</th><th colspan="2">CRIMINAL CASES</th><th colspan="2">(CIV + CRL)</th></tr>
+                <tr><th>Ready (Complete Matters)</th><th>Not Ready (Incomplete Matters)</th><th></th><th></th><th>Ready (Complete Matters)</th><th>Not Ready (Incomplete Matters)</th><th>Ready (Complete Matters)</th><th>Not Ready (Incomplete Matters)</th></tr></thead>
+                <tbody>
+                    <tr><td>0</td><td>0</td><td>--</td><td></td><td>${this.manualCell('yr_b_1')}</td><td>${this.manualCell('yr_b_2')}</td><td>${this.manualCell('yr_b_3')}</td><td>${this.manualCell('yr_b_4')}</td></tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    downloadCurrentStatement() {
+        if (!this.currentStatement) return;
+        const stmt = STATEMENTS.find(s => s.id === this.currentStatement);
+        const html = document.getElementById('modalContent').innerHTML;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const tables = doc.querySelectorAll('table');
+        const wb = XLSX.utils.book_new();
+        tables.forEach((table, idx) => {
+            const ws = XLSX.utils.table_to_sheet(table);
+            const name = idx === 0 ? stmt.name : stmt.name + '_' + (idx+1);
+            XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31));
+        });
+        XLSX.writeFile(wb, 'ACJM_Baghpat_' + stmt.id + '_' + this.currentMonth + '.xlsx');
+    }
+
+    exportJSON() {
+        const dataStr = JSON.stringify(this.data, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'CSM_Backup_' + new Date().toISOString().split('T')[0] + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    importJSON(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if (confirm('This will overwrite all existing data. Continue?')) {
+                    this.data = imported;
+                    if (!this.data.categories) this.data.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+                    if (!this.data.years) this.data.years = [...DEFAULT_YEARS];
+                    this.saveData();
+                    this.renderDataEntry();
+                    this.renderSettings();
+                    alert('Data imported successfully!');
+                }
+            } catch(err) {
+                alert('Invalid JSON file!');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    resetAllData() {
+        if (confirm('DELETE ALL DATA? This cannot be undone!')) {
+            localStorage.removeItem(STORAGE_KEY);
+            this.data = { version: 11, currentMonth: '2026-04', months: {}, years: [...DEFAULT_YEARS], categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)) };
+            this.currentMonth = '2026-04';
+            this.init();
+            alert('All data reset.');
+        }
+    }
+
+    switchTab(tab) {
+        document.querySelectorAll('.nav-btn').forEach(b => {
+            b.classList.remove('active', 'bg-blue-600', 'text-white');
+            b.classList.add('text-slate-600');
+        });
+        const activeBtn = document.getElementById('tab-' + tab);
+        activeBtn.classList.add('active');
+        activeBtn.classList.remove('text-slate-600');
+        document.getElementById('view-dataEntry').style.display = 'none';
+        document.getElementById('view-statements').style.display = 'none';
+        document.getElementById('view-settings').style.display = 'none';
+        document.getElementById('view-' + tab).style.display = 'block';
+        if (tab === 'statements') this.renderStatementsDashboard();
+        if (tab === 'settings') this.renderSettings();
+    }
+
+    newMonth() {
+        const newMonth = prompt('Enter new month (YYYY-MM, e.g., 2026-05):');
+        if (newMonth && /^\d{4}-\d{2}$/.test(newMonth)) {
+            this.currentMonth = newMonth;
+            document.getElementById('monthSelector').value = newMonth;
+            this.ensureMonthExists(newMonth);
+            const [y, m] = newMonth.split('-').map(Number);
+            let prevY = y, prevM = m - 1;
+            if (prevM === 0) { prevY--; prevM = 12; }
+            const prevMonth = prevY + '-' + String(prevM).padStart(2,'0');
+            if (this.data.months[prevMonth]) {
+                if (confirm('Carry forward closing balances from ' + prevMonth + '?')) {
+                    this.carryForwardFrom(prevMonth, newMonth);
+                }
+            }
+            this.saveData();
+            this.renderDataEntry();
+            this.updateStatementBadge();
+        }
+    }
+
+    carryForwardFrom(prevMonth, newMonth) {
+        const prevData = this.data.months[prevMonth].data;
+        const currData = this.getMonthData(newMonth).data;
+        this.getCategories().forEach(cat => {
+            this.getYears().forEach(year => {
+                const prev = prevData[cat.id] && prevData[cat.id][year];
+                if (prev) {
+                    const closing = this.calculateClosing(prev);
+                    if (!currData[cat.id]) currData[cat.id] = {};
+                    if (!currData[cat.id][year]) currData[cat.id][year] = { ob:0, inst_dir:0, inst_trf:0, disp_con:0, disp_uncon:0, disp_trf:0, disp_comm:0, trf_in:0, trf_out:0 };
+                    currData[cat.id][year].ob = closing;
+                }
+            });
+        });
+    }
+
+    saveManualEdits() {
+        const monthData = this.getMonthData(this.currentMonth);
+        const modal = document.getElementById('modalContent');
+        const editableCells = modal.querySelectorAll('[data-manual]');
+        editableCells.forEach(cell => {
+            const key = cell.getAttribute('data-manual');
+            const val = cell.innerText.trim();
+            monthData.manual[key] = isNaN(val) ? val : (val === '-' ? 0 : parseInt(val));
+        });
+        this.saveData();
+        alert('Manual edits saved!');
+        if (this.currentStatement) {
+            modal.innerHTML = this.generateStatementHTML(this.currentStatement);
+        }
+    }
+}
+
+const app = new CourtStatementManager();
+</script>
+</body>
+</html>
